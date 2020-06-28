@@ -88,11 +88,13 @@ const char *houserelays_gpio_configure (int argc, const char **argv) {
 
     RelaysCount = houserelays_config_array_length (relays);
     if (RelaysCount <= 0) return "no point found";
+    if (echttp_isdebug()) fprintf (stderr, "found %d points\n", RelaysCount);
 
     Relays = calloc(sizeof(struct RelayMap), RelaysCount);
     if (!Relays) return "no more memory";
 
     RelayChip = gpiod_chip_open_by_number(chip);
+    if (!RelayChip) return "cannot access GPIO";
 
     for (i = 0; i < RelaysCount; ++i) {
         int point;
@@ -103,6 +105,7 @@ const char *houserelays_gpio_configure (int argc, const char **argv) {
             Relays[i].name = houserelays_config_string (point, ".name");
             Relays[i].gpio = houserelays_config_integer (point, ".gpio");
             Relays[i].on  = houserelays_config_integer (point, ".on") & 1;
+            if (echttp_isdebug()) fprintf (stderr, "found point %s, gpio %d, on %d\n", Relays[i].name, Relays[i].gpio, Relays[i].on);
 
             Relays[i].off = 1 - Relays[i].on;
             Relays[i].line = gpiod_chip_get_line (RelayChip, Relays[i].gpio);

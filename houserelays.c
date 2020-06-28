@@ -189,6 +189,8 @@ static void hc_background (int fd, int mode) {
 
 int main (int argc, const char **argv) {
 
+    const char *error;
+
     // These strange statements are to make sure that fds 0 to 2 are
     // reserved, since this application might output some errors.
     // 3 descriptors are wasted if 0, 1 and 2 are already open. No big deal.
@@ -201,8 +203,16 @@ int main (int argc, const char **argv) {
         houseportal_initialize (argc, argv);
         use_houseportal = 1;
     }
-    houserelays_config_load (argc, argv);
-    houserelays_gpio_configure (argc, argv);
+    error = houserelays_config_load (argc, argv);
+    if (error) {
+        fprintf (stderr, "Cannot load configuration: %s\n", error);
+        exit(1);
+    }
+    error = houserelays_gpio_configure (argc, argv);
+    if (error) {
+        fprintf (stderr, "Cannot initialize GPIO: %s\n", error);
+        exit(1);
+    }
 
     echttp_route_uri ("/relays/status", relays_status);
     echttp_route_uri ("/relays/set", relays_set);

@@ -125,7 +125,7 @@ int houserelays_config_find (int parent, const char *path, int type) {
     int i;
     if (parent < 0 || parent >= ConfigTokenCount) return -1;
     i = echttp_json_search(ConfigParsed+parent, path);
-    if (i >= 0 && ConfigParsed[i].type == type) return i;
+    if (i >= 0 && ConfigParsed[i].type == type) return parent+i;
     return -1;
 }
 
@@ -139,7 +139,7 @@ int houserelays_config_integer (int parent, const char *path) {
     return (i >= 0) ? ConfigParsed[i].value.integer : 0;
 }
 
-double houserelays_config_boolean (int parent, const char *path) {
+int houserelays_config_boolean (int parent, const char *path) {
     int i = houserelays_config_find(parent, path, JSON_BOOL);
     return (i >= 0) ? ConfigParsed[i].value.bool : 0;
 }

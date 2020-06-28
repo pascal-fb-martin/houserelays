@@ -26,7 +26,7 @@ int houserelays_config_size (void);
 
 const char *houserelays_config_string  (int parent, const char *path);
 int         houserelays_config_integer (int parent, const char *path);
-double      houserelays_config_boolean (int parent, const char *path);
+int         houserelays_config_boolean (int parent, const char *path);
 
 int houserelays_config_array        (int parent, const char *path);
 int houserelays_config_array_length (int array);
