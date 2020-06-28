@@ -125,7 +125,7 @@ int houserelays_config_find (int parent, const char *path, int type) {
     int i;
     if (parent < 0 || parent >= ConfigTokenCount) return -1;
     i = echttp_json_search(ConfigParsed+parent, path);
-    if (i >= 0 && ConfigParsed[i].type == type) return parent+i;
+    if (i >= 0 && ConfigParsed[parent+i].type == type) return parent+i;
     return -1;
 }
 
