@@ -60,19 +60,18 @@ static void relays_status_one (char *buffer, int size, int point,
                                const char *prefix, const char *suffix) {
 
     time_t pulsed = houserelays_gpio_deadline(point);
+    const char *name = houserelays_gpio_name(point);
+    const char *commanded = houserelays_gpio_commanded(point)?"on":"off";
+
     if (pulsed) {
         int remains = (int) (pulsed - time(0));
         snprintf (buffer, size,
-                  "%s\"%s\":{\"state\":%d,\"command\":%d,\"pulse\":%d}%s", prefix,
-                  houserelays_gpio_name(point),
-                  houserelays_gpio_get(point),
-                  houserelays_gpio_commanded(point), remains, suffix);
+                  "%s\"%s\":{\"state\":%d,\"command\":\"%s\",\"pulse\":%d}%s", prefix,
+                  name, houserelays_gpio_get(point), commanded, remains, suffix);
     } else {
         snprintf (buffer, size,
-                  "%s\"%s\":{\"state\":%d,\"command\":%d}%s", prefix,
-                  houserelays_gpio_name(point),
-                  houserelays_gpio_get(point),
-                  houserelays_gpio_commanded(point), suffix);
+                  "%s\"%s\":{\"state\":%d,\"command\":\"%s\"}%s", prefix,
+                  name, houserelays_gpio_get(point), commanded, suffix);
     }
 }
 
@@ -116,9 +115,18 @@ static const char *relays_set (const char *method, const char *uri,
         return "";
     }
     if (!statep) {
+        echttp_error (400, "missing state value");
+        return "";
+    }
+    if ((strcmp(statep, "on") == 0) || (strcmp(statep, "1") == 0)) {
+        state = 1;
+    } else if ((strcmp(statep, "off") == 0) || (strcmp(statep, "0") == 0)) {
+        state = 0;
+    } else {
         echttp_error (400, "invalid state value");
         return "";
     }
+
     state = atoi(statep) & 1;
 
     pulse = pulsep ? atoi(pulsep) : 0;

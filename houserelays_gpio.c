@@ -157,8 +157,9 @@ int houserelays_gpio_get (int point) {
 int houserelays_gpio_set (int point, int state, int pulse) {
 
     if (echttp_isdebug()) {
-        if (pulse) fprintf (stderr, "set %s to %d at %ld (pulse %ds)\n", Relays[point].name, state, time(0), pulse);
-        else       fprintf (stderr, "set %s to %d at %ld\n", Relays[point].name, state, time(0));
+        const char *namedstate = state?"on":"off";
+        if (pulse) fprintf (stderr, "set %s to %s at %ld (pulse %ds)\n", Relays[point].name, namedstate, time(0), pulse);
+        else       fprintf (stderr, "set %s to %s at %ld\n", Relays[point].name, namedstate, time(0));
     }
     if (point < 0 || point > RelaysCount) return 0;
     gpiod_line_set_value(Relays[point].line,
