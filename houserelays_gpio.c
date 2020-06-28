@@ -171,7 +171,7 @@ void houserelays_gpio_periodic (void) {
     time_t now = time(0);
 
     for (i = 0; i < RelaysCount; ++i) {
-        if (Relays[i].deadline > 0 && Relays[i].deadline < now) {
+        if (Relays[i].deadline > 0 && now <= Relays[i].deadline) {
             houserelays_gpio_set (i, 1 - Relays[i].state, 0);
         }
     }
