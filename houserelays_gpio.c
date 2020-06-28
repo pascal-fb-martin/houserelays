@@ -116,8 +116,13 @@ const char *houserelays_gpio_configure (int argc, const char **argv) {
             Relays[i].state = Relays[i].off;
             Relays[i].deadline = 0;
 
-            gpiod_line_request_output
-                (Relays[i].line, Relays[i].name, GPIOD_LINE_ACTIVE_STATE_HIGH);
+            if (Relays[i].on) {
+                gpiod_line_request_output
+                    (Relays[i].line, Relays[i].name, GPIOD_LINE_ACTIVE_STATE_HIGH);
+            } else {
+                gpiod_line_request_output_flags
+                    (Relays[i].line, Relays[i].name, GPIOD_LINE_REQUEST_FLAG_OPEN_DRAIN, GPIOD_LINE_ACTIVE_STATE_HIGH);
+            }
             gpiod_line_set_value(Relays[i].line, Relays[i].off);
         }
     }
