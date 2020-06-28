@@ -101,7 +101,7 @@ static const char *relays_status (const char *method, const char *uri,
 
 static const char *relays_set (const char *method, const char *uri,
                                 const char *data, int length) {
-    static char buffer[65537];
+
     const char *point = echttp_parameter_get("point");
     const char *statep = echttp_parameter_get("state");
     const char *pulsep = echttp_parameter_get("pulse");
@@ -109,6 +109,7 @@ static const char *relays_set (const char *method, const char *uri,
     int pulse;
     int i;
     int count = houserelays_gpio_count();
+    int found = 0;
 
     if (!point) {
         echttp_error (404, "missing point name");
@@ -127,8 +128,6 @@ static const char *relays_set (const char *method, const char *uri,
         return "";
     }
 
-    state = atoi(statep) & 1;
-
     pulse = pulsep ? atoi(pulsep) : 0;
     if (pulse < 0) {
         echttp_error (400, "invalid pulse value");
@@ -136,15 +135,18 @@ static const char *relays_set (const char *method, const char *uri,
     }
 
     for (i = 0; i < count; ++i) {
-       if (strcmp (point, houserelays_gpio_name(i)) == 0) {
+       if ((strcmp (point, "all") == 0) ||
+           (strcmp (point, houserelays_gpio_name(i)) == 0)) {
+           found = 1;
            houserelays_gpio_set (i, state, pulse);
-           relays_status_one
-               (buffer, sizeof(buffer), i, "{\"status\":{", "}}");
        }
     }
 
-    echttp_content_type_json ();
-    return buffer;
+    if (! found) {
+        echttp_error (404, "invalid point name");
+        return "";
+    }
+    return relays_status (method, uri, data, length);
 }
 
 static const char *relays_history (const char *method, const char *uri,
