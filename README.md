@@ -15,7 +15,7 @@ This way relay boards may be installed at convenient points in the home, and be 
 
 The typical hardware supported by this applications are the relay board controlled by 5V TTL signals, typically connected to the digital output of a Raspberry Pi, Odroid or other small Linux computers.
 
-# Web API.
+# Web API
 
 The API supported by this server is designed to be as generic as possible. The goal is to reuse the same API for different classes of hardware in the future. Each relay is accessed by a name, which is independent of the actual wiring between the relay board and the computer. It is recommended to use a name that represents the device connected to the relay. Not only this makes the client independent of which relay is used, but by keeping the names are unique across the network this will also allow the client to discover which server offer access to the device
 
