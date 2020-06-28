@@ -72,7 +72,7 @@ struct RelayMap {
     int on;
     int off;
     struct gpiod_line *line;
-    int state;
+    int commanded;
     time_t deadline;
 };
 
@@ -113,7 +113,7 @@ const char *houserelays_gpio_configure (int argc, const char **argv) {
 
             Relays[i].off = 1 - Relays[i].on;
             Relays[i].line = gpiod_chip_get_line (RelayChip, Relays[i].gpio);
-            Relays[i].state = Relays[i].off;
+            Relays[i].commanded = 0;
             Relays[i].deadline = 0;
 
             if (Relays[i].on) {
@@ -141,7 +141,7 @@ const char *houserelays_gpio_name (int point) {
 
 int houserelays_gpio_commanded (int point) {
     if (point < 0 || point > RelaysCount) return 0;
-    return Relays[point].state;
+    return Relays[point].commanded;
 }
 
 time_t houserelays_gpio_deadline (int point) {
@@ -168,7 +168,7 @@ int houserelays_gpio_set (int point, int state, int pulse) {
         Relays[point].deadline = time(0) + pulse;
     else
         Relays[point].deadline = 0;
-    Relays[point].state = state;
+    Relays[point].commanded = state;
     return 1;
 }
 
@@ -178,7 +178,7 @@ void houserelays_gpio_periodic (void) {
 
     for (i = 0; i < RelaysCount; ++i) {
         if (Relays[i].deadline > 0 && now >= Relays[i].deadline) {
-            houserelays_gpio_set (i, 1 - Relays[i].state, 0);
+            houserelays_gpio_set (i, 1 - Relays[i].commanded, 0);
         }
     }
 }
