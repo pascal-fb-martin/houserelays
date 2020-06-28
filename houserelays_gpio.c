@@ -118,7 +118,7 @@ const char *houserelays_gpio_configure (int argc, const char **argv) {
 
             gpiod_line_request_output
                 (Relays[i].line, Relays[i].name, GPIOD_LINE_ACTIVE_STATE_HIGH);
-            gpiod_line_set_value(Relays[point].line, Relays[point].off);
+            gpiod_line_set_value(Relays[i].line, Relays[i].off);
         }
     }
     return 0;
