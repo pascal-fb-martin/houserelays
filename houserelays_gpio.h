@@ -26,9 +26,10 @@ const char *houserelays_gpio_configure (int argc, const char **argv);
 int houserelays_gpio_count (void);
 const char *houserelays_gpio_name (int point);
 
-int    houserelays_gpio_status   (int point);
-time_t houserelays_gpio_deadline (int point);
-int    houserelays_gpio_set      (int point, int state, int pulse);
+int    houserelays_gpio_commanded (int point);
+time_t houserelays_gpio_deadline  (int point);
+int    houserelays_gpio_get       (int point);
+int    houserelays_gpio_set       (int point, int state, int pulse);
 
 void houserelays_gpio_periodic (void);
 

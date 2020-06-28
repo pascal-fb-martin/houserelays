@@ -63,14 +63,16 @@ static void relays_status_one (char *buffer, int size, int point,
     if (pulsed) {
         int remains = (int) (pulsed - time(0));
         snprintf (buffer, size,
-                  "%s\"%s\":{\"state\":%d,\"pulse\":%d}%s", prefix,
+                  "%s\"%s\":{\"state\":%d,\"command\":%d,\"pulse\":%d}%s", prefix,
                   houserelays_gpio_name(point),
-                  houserelays_gpio_status(point), remains, suffix);
+                  houserelays_gpio_get(point),
+                  houserelays_gpio_commanded(point), remains, suffix);
     } else {
         snprintf (buffer, size,
-                  "%s\"%s\":{\"state\":%d}%s", prefix,
+                  "%s\"%s\":{\"state\":%d,\"command\":%d}%s", prefix,
                   houserelays_gpio_name(point),
-                  houserelays_gpio_status(point), suffix);
+                  houserelays_gpio_get(point),
+                  houserelays_gpio_commanded(point), suffix);
     }
 }
 

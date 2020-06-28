@@ -35,11 +35,15 @@
  *
  *    Return the name of a relay point.
  *
- * int houserelays_gpio_status (int point);
+ * int houserelays_gpio_commanded (int point);
  * time_t houserelays_gpio_deadline (int point);
  *
  *    Return the last commanded state, or the command deadline, for
  *    the specified relay point.
+ *
+ * int houserelays_gpio_get (int point);
+ *
+ *    Get the actual state of the point.
  *
  * int houserelays_gpio_set (int point, int state, int pulse);
  *
@@ -109,11 +113,12 @@ const char *houserelays_gpio_configure (int argc, const char **argv) {
 
             Relays[i].off = 1 - Relays[i].on;
             Relays[i].line = gpiod_chip_get_line (RelayChip, Relays[i].gpio);
-            Relays[i].state = 0;
+            Relays[i].state = Relays[i].off;
             Relays[i].deadline = 0;
 
-            gpiod_line_request_output (Relays[i].line, Relays[i].name,
-                                       Relays[i].on?GPIOD_LINE_ACTIVE_STATE_HIGH:GPIOD_LINE_ACTIVE_STATE_LOW);
+            gpiod_line_request_output
+                (Relays[i].line, Relays[i].name, GPIOD_LINE_ACTIVE_STATE_HIGH);
+            gpiod_line_set_value(Relays[point].line, Relays[point].off);
         }
     }
     return 0;
@@ -129,7 +134,7 @@ const char *houserelays_gpio_name (int point) {
     return Relays[point].name;
 }
 
-int houserelays_gpio_status (int point) {
+int houserelays_gpio_commanded (int point) {
     if (point < 0 || point > RelaysCount) return 0;
     return Relays[point].state;
 }
@@ -137,6 +142,11 @@ int houserelays_gpio_status (int point) {
 time_t houserelays_gpio_deadline (int point) {
     if (point < 0 || point > RelaysCount) return 0;
     return Relays[point].deadline;
+}
+
+int houserelays_gpio_get (int point) {
+    if (point < 0 || point > RelaysCount) return 0;
+    return gpiod_line_get_value (Relays[point].line);
 }
 
 int houserelays_gpio_set (int point, int state, int pulse) {
