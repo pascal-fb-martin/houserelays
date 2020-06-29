@@ -33,6 +33,11 @@
  *    Return a file descriptor (and the size) of the configuration file
  *    being used.
  *
+ * const char *houserelays_config_update (const char *text);
+ *
+ *    Update both the live configuration and the configuration file with
+ *    the provided text.
+ *
  * const char *houserelays_config_string  (int parent, const char *path);
  * int         houserelays_config_integer (int parent, const char *path);
  * double      houserelays_config_boolean (int parent, const char *path);
@@ -61,6 +66,7 @@
 #include <echttp_json.h>
 
 #include "houserelays.h"
+#include "houserelays_config.h"
 
 #define CONFIGMAXSIZE 1024
 
@@ -75,8 +81,6 @@ static const char *ConfigFile = "/etc/house/relays.json";
 const char *houserelays_config_load (int argc, const char **argv) {
 
     struct stat filestat;
-    const char *error;
-    int count;
     int fd;
     int i;
 
@@ -90,8 +94,8 @@ const char *houserelays_config_load (int argc, const char **argv) {
 
     if (filestat.st_size <= 0) return "empty config file";
 
-    if (filestat.st_size > ConfigTextSize) {
-        ConfigTextSize = filestat.st_size + 1;
+    if (filestat.st_size >= ConfigTextSize) {
+        ConfigTextSize = filestat.st_size + 128;
         ConfigText = (char *) realloc (ConfigText, ConfigTextSize);
     }
     ConfigTextLength = filestat.st_size;
@@ -105,11 +109,31 @@ const char *houserelays_config_load (int argc, const char **argv) {
     close(fd);
     ConfigText[filestat.st_size] = 0; // Terminate the JSON string.
 
-    count = CONFIGMAXSIZE;
-    error = echttp_json_parse (ConfigText, ConfigParsed, &count);
+    ConfigTokenCount = CONFIGMAXSIZE;
+    return echttp_json_parse (ConfigText, ConfigParsed, &ConfigTokenCount);
+}
+
+const char *houserelays_config_update (const char *text) {
+
+    const char *error;
+    int fd;
+
+    ConfigTextLength = strlen(text);
+    if (ConfigTextLength >= ConfigTextSize) {
+        ConfigTextSize = ConfigTextLength + 128;
+        ConfigText = (char *) realloc (ConfigText, ConfigTextSize);
+    }
+    strncpy (ConfigText, text, ConfigTextSize);
+
+    ConfigTokenCount = CONFIGMAXSIZE;
+    error = echttp_json_parse (ConfigText, ConfigParsed, &ConfigTokenCount);
     if (error) return error;
 
-    ConfigTokenCount = count;
+    fd = open (ConfigFile, O_WRONLY+O_CREAT, 0777);
+    if (fd >= 0) {
+        write (fd, text, ConfigTextLength);
+        close (fd);
+    }
     return 0;
 }
 

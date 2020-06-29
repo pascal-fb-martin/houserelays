@@ -22,6 +22,7 @@
  *
  */
 const char *houserelays_gpio_configure (int argc, const char **argv);
+const char *houserelays_gpio_refresh (void);
 
 int houserelays_gpio_count (void);
 const char *houserelays_gpio_name (int point);

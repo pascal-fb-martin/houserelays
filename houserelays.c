@@ -165,20 +165,13 @@ static const char *relays_config (const char *method, const char *uri,
         echttp_transfer (houserelays_config_file(), houserelays_config_size());
         echttp_content_type_json ();
     } else if (strcmp ("POST", method) == 0) {
-        // TBD.
+        const char *error = houserelays_config_update (data);
+        if (error) echttp_error (400, error);
+        houserelays_gpio_refresh ();
     } else {
         echttp_error (400, "invalid state value");
     }
     return "";
-}
-
-static const char *relays_hardware (const char *method, const char *uri,
-                                       const char *data, int length) {
-    static char buffer[65537];
-
-    buffer[0] = 0;
-    echttp_content_type_json ();
-    return buffer;
 }
 
 static void hc_background (int fd, int mode) {

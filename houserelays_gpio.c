@@ -27,6 +27,10 @@
  *    Retrieve the configuration and initialize access to the relays.
  *    Return the number of configured relay points available.
  *
+ * const char *houserelays_gpio_refresh (void);
+ *
+ *    Re-evaluate the GPIO setup after the configuration changed.
+ *
  * int houserelays_gpio_count (void);
  *
  *    Return the number of configured relay points available.
@@ -79,12 +83,22 @@ struct RelayMap {
 static struct RelayMap *Relays;
 static int RelaysCount = 0;
 
-static struct gpiod_chip *RelayChip;
+static struct gpiod_chip *RelayChip = 0;
 
 
 const char *houserelays_gpio_configure (int argc, const char **argv) {
+    return houserelays_gpio_refresh ();
+}
+
+const char *houserelays_gpio_refresh (void) {
 
     int i;
+    for (i = 0; i < RelaysCount; ++i) {
+        gpiod_line_release (Relays[i].line);
+        Relays[i].name = 0;
+    }
+    if (RelayChip) gpiod_chip_close (RelayChip);
+
     int chip = houserelays_config_integer (0, ".relays.iochip");
 
     int relays = houserelays_config_array (0, ".relays.points");
@@ -128,7 +142,6 @@ const char *houserelays_gpio_configure (int argc, const char **argv) {
     }
     return 0;
 }
-
 
 int houserelays_gpio_count (void) {
     return RelaysCount;
