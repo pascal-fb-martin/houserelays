@@ -32,6 +32,7 @@
 #include "houseportalclient.h"
 
 #include "houserelays.h"
+#include "houserelays_history.h"
 #include "houserelays_config.h"
 #include "houserelays_gpio.h"
 
@@ -152,8 +153,26 @@ static const char *relays_set (const char *method, const char *uri,
 static const char *relays_history (const char *method, const char *uri,
                                       const char *data, int length) {
     static char buffer[65537];
+    int cursor;
+    const char *prefix = "";
+    time_t timestamp;
+    char *name;
+    char *command;
+    int pulse;
+    int i = houserelays_history_first (&timestamp, &name, &command, &pulse);
 
-    buffer[0] = 0;
+    snprintf (buffer, sizeof(buffer), "{\"history\":[");
+    cursor = strlen(buffer);
+
+    while (i >= 0) {
+        snprintf (buffer+cursor, sizeof(buffer)-cursor,
+                  "%s{\"t\":%ld,\"point\":\"%s\",\"cmd\":\"%s\",\"pulse\":%d}",
+                  prefix, timestamp, name, command, pulse);
+        cursor += strlen(buffer+cursor);
+        prefix = ",";
+        i = houserelays_history_next (i, &timestamp, &name, &command, &pulse);
+    }
+    snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
     echttp_content_type_json ();
     return buffer;
 }

@@ -68,6 +68,7 @@
 
 #include "houserelays.h"
 #include "houserelays_config.h"
+#include "houserelays_history.h"
 #include "houserelays_gpio.h"
 
 struct RelayMap {
@@ -169,8 +170,9 @@ int houserelays_gpio_get (int point) {
 
 int houserelays_gpio_set (int point, int state, int pulse) {
 
+    const char *namedstate = state?"on":"off";
+
     if (echttp_isdebug()) {
-        const char *namedstate = state?"on":"off";
         if (pulse) fprintf (stderr, "set %s to %s at %ld (pulse %ds)\n", Relays[point].name, namedstate, time(0), pulse);
         else       fprintf (stderr, "set %s to %s at %ld\n", Relays[point].name, namedstate, time(0));
     }
@@ -182,6 +184,7 @@ int houserelays_gpio_set (int point, int state, int pulse) {
     else
         Relays[point].deadline = 0;
     Relays[point].commanded = state;
+    houserelays_history_add (Relays[point].name, namedstate, pulse);
     return 1;
 }
 
