@@ -18,7 +18,7 @@ PIDFILE=/var/run/houserelays.pid
 
 test -x $DAEMON || exit 0
 
-OPTS=
+OPTS=-http-service=dynamic
 
 if [ -r /etc/default/houserelays ]; then
 	. /etc/default/houserelays

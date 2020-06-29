@@ -3,9 +3,9 @@ A web server to control relays
 
 # Overview
 
-This web server is designed to provide web access to a relay board.
+This web server is designed to provide access to a relay board.
 
-The primary intent is to support a distributed network of relay boards, to avoid pulling electric wires from one side of the home to the other: a small set of relay boards is installed, each board located close to existing wiring or near the equipment to control. Each relay board is attached to a small computer (e.g. Raspberry Pi Zero W). By using such a micro-service architecture, the sprinkler controler software may run anywhere in the home and still access all the devices, regardless of their locations.
+The primary intent is to support a distributed network of relay boards, to avoid pulling electric wires from one side of the home to the other: a small set of relay boards is installed, each board located close to existing wiring or near the equipment to control. Each relay board is attached to a small computer (e.g. Raspberry Pi Zero W). The typical use is to control sprinklers, a garage door, etc. By using such a micro-service architecture, the application may run anywhere in the home and still access all the devices, regardless of their locations.
 
 The secondary intent is to share a relay board between multiple independent applications: sprinkler system, garage door controller, etc. Each application control only those devices that it is configured for.
 
@@ -13,11 +13,39 @@ This way relay boards may be installed at convenient points in the home, and be 
 
 # Hardware
 
-The typical hardware supported by this applications are the relay board controlled by 5V TTL signals, typically connected to the digital output of a Raspberry Pi, Odroid or other small Linux computers.
+The typical hardware supported by this applications are relay boards controlled through 5V TTL digital pins. These are wired to the digital I/O pins of a Raspberry Pi, Odroid or other small Linux computers. Depending on the model, these board are either controlled using open-drain outputs (active low) or 3-state outputs (active high).
+
+The hardware interface is configured through the file /etc/house/relays.json. A typical exemple of configuration is:
+```
+{
+    "relays" : {
+        "iochip" : 0,
+        "points" : [
+            {
+                "name" : "relay1",
+                "gpio" : 4,
+                "on" : 0
+            },
+            {
+                "name" : "relay2",
+                "gpio" : 17,
+                "on" : 0
+            }
+        ]
+    }
+}
+```
+The iochip item must match the Linux gpiod chip index. The gpio item must match the gpiod line offset (this also matches the usual Raspberry Pi naming convention for I/O pin names, e.g. GPIO4, GPIO17).
+
+If on is 0, the output is configured as open-drain, the on command sets the output to 0, and the off command sets the output to 1.
+
+If on is 1, the output is configured as 3-state, the on command sets the output to 1, and the off command sets the output to 0.
 
 # Web API
 
-The API supported by this server is designed to be as generic as possible. The goal is to reuse the same API for different classes of hardware in the future. Each relay is accessed by a name, which is independent of the actual wiring between the relay board and the computer. It is recommended to use a name that represents the device connected to the relay. Not only this makes the client independent of which relay is used, but by keeping the names are unique across the network this will also allow the client to discover which server offer access to the device
+The API supported by this server is designed to be as generic as possible. The goal is to reuse the same API for different classes of hardware in the future. Each relay is accessed by a name, which is independent of the actual wiring between the relay board and the computer.
+
+It is recommended to use for each relay a name that represents the device connected to the relay and is unique across the network. Not only does this make the client independent of which relay is used, but will also allow the clients to discover which servers offer access to the devices they are controlling. (The default configuration provided does not follow this convention because it assumes that no application has been configured yet.)
 
 The basic services included are:
 * Send controls (with optional pulse timer).
@@ -36,7 +64,7 @@ GET /relays/set?point=NAME&state=off|0|on|1&pulse=N
 ```
 Set the specified relay point to the specified state. If the pulse parameter is present the point is maintained for the specified number of seconds, then reverted (i.e. if state is 1 and pulse if 10, the relay is set active for 10 seconds then changed to inactive after 10 seconds). If the pulse parameter is not present or its value is 0, the specified state is maintained until the next set request is issued.
 
-The point name "all" denotes all points served by this web server. Use with caution if the service is shared between applications. It is more meant for maintenance.
+The point name "all" denotes all points served by this web server. Use with caution as the service maybe shared between multiple applications. It is intended for maintenance only.
 ```
 GET /relays/history
 ```
