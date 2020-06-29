@@ -166,9 +166,16 @@ static const char *relays_history (const char *method, const char *uri,
 
     while (i >= 0) {
         snprintf (buffer+cursor, sizeof(buffer)-cursor,
-                  "%s{\"t\":%ld,\"point\":\"%s\",\"cmd\":\"%s\",\"pulse\":%d}",
-                  prefix, timestamp, name, command, pulse);
+                  "%s{\"time\":%ld,\"point\":\"%s\",\"cmd\":\"%s\"",
+                  prefix, (long)timestamp, name, command, pulse);
         cursor += strlen(buffer+cursor);
+        if (pulse) {
+            snprintf (buffer+cursor, sizeof(buffer)-cursor,
+                      ",\"pulse\":%d", pulse);
+            cursor += strlen(buffer+cursor);
+        }
+        buffer[cursor++] = '}';
+
         prefix = ",";
         i = houserelays_history_next (i, &timestamp, &name, &command, &pulse);
     }
