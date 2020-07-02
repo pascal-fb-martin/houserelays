@@ -57,22 +57,22 @@ static void hc_help (const char *argv0) {
     exit (0);
 }
 
-static void relays_status_one (char *buffer, int size, int point,
-                               const char *prefix, const char *suffix) {
+static void relays_status_one (char *buffer, int size,
+                               int point, const char *prefix) {
 
     time_t pulsed = houserelays_gpio_deadline(point);
     const char *name = houserelays_gpio_name(point);
     const char *commanded = houserelays_gpio_commanded(point)?"on":"off";
 
     if (pulsed) {
-        int remains = (int) (pulsed - time(0));
+        int rest = (int) (pulsed - time(0));
         snprintf (buffer, size,
-                  "%s\"%s\":{\"state\":%d,\"command\":\"%s\",\"pulse\":%d}%s", prefix,
-                  name, houserelays_gpio_get(point), commanded, remains, suffix);
+                  "%s\"%s\":{\"state\":%d,\"command\":\"%s\",\"pulse\":%d}",
+                  prefix, name, houserelays_gpio_get(point), commanded, rest);
     } else {
         snprintf (buffer, size,
-                  "%s\"%s\":{\"state\":%d,\"command\":\"%s\"}%s", prefix,
-                  name, houserelays_gpio_get(point), commanded, suffix);
+                  "%s\"%s\":{\"state\":%d,\"command\":\"%s\"}",
+                  prefix, name, houserelays_gpio_get(point), commanded);
     }
 }
 
@@ -88,8 +88,7 @@ static const char *relays_status (const char *method, const char *uri,
     cursor = strlen(buffer);
 
     for (i = 0; i < count; ++i) {
-        relays_status_one
-            (buffer+cursor, sizeof(buffer)-cursor, i, prefix, "");
+        relays_status_one (buffer+cursor, sizeof(buffer)-cursor, i, prefix);
         prefix = ",";
         cursor += strlen(buffer+cursor);
     }
