@@ -155,14 +155,14 @@ static const char *relays_history (const char *method, const char *uri,
     JsonContext context = echttp_json_start (token, 8192, pool, 81920);
 
     int root = echttp_json_add_object (context, 0, 0);
-    int container = echttp_json_add_object (context, root, "history");
+    int container = echttp_json_add_array (context, root, "history");
 
     while (i >= 0) {
-        int point = echttp_json_add_object (context, container, name);
-        echttp_json_add_integer (context, point, "time", (long)timestamp);
-        echttp_json_add_string (context, point, "point", name);
-        echttp_json_add_string (context, point, "cmd", command);
-        if (pulse) echttp_json_add_integer (context, point, "pulse", pulse);
+        int event = echttp_json_add_object (context, container, 0);
+        echttp_json_add_integer (context, event, "time", (long)timestamp);
+        echttp_json_add_string (context, event, "point", name);
+        echttp_json_add_string (context, event, "cmd", command);
+        if (pulse) echttp_json_add_integer (context, event, "pulse", pulse);
 
         i = houserelays_history_next (i, &timestamp, &name, &command, &pulse);
     }
