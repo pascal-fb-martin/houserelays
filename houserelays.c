@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "echttp_json.h"
 #include "echttp_static.h"
 #include "houseportalclient.h"
 
@@ -57,44 +58,35 @@ static void hc_help (const char *argv0) {
     exit (0);
 }
 
-static void relays_status_one (char *buffer, int size,
-                               int point, const char *prefix) {
-
-    time_t pulsed = houserelays_gpio_deadline(point);
-    const char *name = houserelays_gpio_name(point);
-    const char *commanded = houserelays_gpio_commanded(point)?"on":"off";
-
-    if (pulsed) {
-        int rest = (int) (pulsed - time(0));
-        snprintf (buffer, size,
-                  "%s\"%s\":{\"state\":%d,\"command\":\"%s\",\"pulse\":%d}",
-                  prefix, name, houserelays_gpio_get(point), commanded, rest);
-    } else {
-        snprintf (buffer, size,
-                  "%s\"%s\":{\"state\":%d,\"command\":\"%s\"}",
-                  prefix, name, houserelays_gpio_get(point), commanded);
-    }
-}
-
 static const char *relays_status (const char *method, const char *uri,
                                    const char *data, int length) {
     static char buffer[65537];
+    JsonToken token[1024];
+    char pool[65537];
     int count = houserelays_gpio_count();
     int i;
-    int cursor;
-    const char *prefix = "";
 
-    snprintf (buffer, sizeof(buffer), "{\"status\":{");
-    cursor = strlen(buffer);
+    JsonContext context = echttp_json_start (token, 1024, pool, 65537);
+
+    int root = echttp_json_add_object (context, 0, 0);
+    int container = echttp_json_add_object (context, root, "status");
 
     for (i = 0; i < count; ++i) {
-        relays_status_one (buffer+cursor, sizeof(buffer)-cursor, i, prefix);
-        prefix = ",";
-        cursor += strlen(buffer+cursor);
+        time_t pulsed = houserelays_gpio_deadline(i);
+        const char *name = houserelays_gpio_name(i);
+        const char *commanded = houserelays_gpio_commanded(i)?"on":"off";
+
+        int point = echttp_json_add_object (context, container, name);
+        echttp_json_add_integer (context, point, "state", houserelays_gpio_get(i));
+        echttp_json_add_string (context, point, "command", commanded);
+        if (pulsed)
+            echttp_json_add_integer (context, point, "pulse", (int)pulsed);
     }
-
-    snprintf (buffer+cursor, sizeof(buffer)-cursor, "}}");
-
+    const char *error = echttp_json_format (context, buffer, 65537);
+    if (error) {
+        echttp_error (500, error);
+        return "";
+    }
     echttp_content_type_json ();
     return buffer;
 }
@@ -151,34 +143,34 @@ static const char *relays_set (const char *method, const char *uri,
 
 static const char *relays_history (const char *method, const char *uri,
                                       const char *data, int length) {
-    static char buffer[65537];
-    int cursor;
-    const char *prefix = "";
+    static char buffer[81920];
+    static JsonToken token[8192];
+    static char pool[81920];
     time_t timestamp;
     char *name;
     char *command;
     int pulse;
     int i = houserelays_history_first (&timestamp, &name, &command, &pulse);
 
-    snprintf (buffer, sizeof(buffer), "{\"history\":[");
-    cursor = strlen(buffer);
+    JsonContext context = echttp_json_start (token, 8192, pool, 81920);
+
+    int root = echttp_json_add_object (context, 0, 0);
+    int container = echttp_json_add_object (context, root, "history");
 
     while (i >= 0) {
-        snprintf (buffer+cursor, sizeof(buffer)-cursor,
-                  "%s{\"time\":%ld,\"point\":\"%s\",\"cmd\":\"%s\"",
-                  prefix, (long)timestamp, name, command, pulse);
-        cursor += strlen(buffer+cursor);
-        if (pulse) {
-            snprintf (buffer+cursor, sizeof(buffer)-cursor,
-                      ",\"pulse\":%d", pulse);
-            cursor += strlen(buffer+cursor);
-        }
-        buffer[cursor++] = '}';
+        int point = echttp_json_add_object (context, container, name);
+        echttp_json_add_integer (context, point, "time", (long)timestamp);
+        echttp_json_add_string (context, point, "point", name);
+        echttp_json_add_string (context, point, "cmd", command);
+        if (pulse) echttp_json_add_integer (context, point, "pulse", pulse);
 
-        prefix = ",";
         i = houserelays_history_next (i, &timestamp, &name, &command, &pulse);
     }
-    snprintf (buffer+cursor, sizeof(buffer)-cursor, "]}");
+    const char *error = echttp_json_format (context, buffer, 81920);
+    if (error) {
+        echttp_error (500, error);
+        return "";
+    }
     echttp_content_type_json ();
     return buffer;
 }
