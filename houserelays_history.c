@@ -83,7 +83,10 @@ int houserelays_history_next  (int cursor, time_t *timestamp,
     int i;
 
     for (i = cursor + 1; i != RelaysLogCursor; ++i) {
-        if (i >= RELAY_LOG_DEPTH) i = 0;
+        if (i >= RELAY_LOG_DEPTH) {
+            i = 0;
+            if (!RelaysLogCursor) break;
+        }
         if (RelaysLog[i].timestamp) {
             *timestamp = RelaysLog[i].timestamp;
             *name = RelaysLog[i].name;
