@@ -82,7 +82,7 @@ static const char *relays_status (const char *method, const char *uri,
         if (pulsed)
             echttp_json_add_integer (context, point, "pulse", (int)pulsed);
     }
-    const char *error = echttp_json_format (context, buffer, 65537);
+    const char *error = echttp_json_export (context, buffer, 65537);
     if (error) {
         echttp_error (500, error);
         return "";
@@ -166,7 +166,7 @@ static const char *relays_history (const char *method, const char *uri,
 
         i = houserelays_history_next (i, &timestamp, &name, &command, &pulse);
     }
-    const char *error = echttp_json_format (context, buffer, 81920);
+    const char *error = echttp_json_export (context, buffer, 81920);
     if (error) {
         echttp_error (500, error);
         return "";
