@@ -1,7 +1,7 @@
 # houserelays
 A web server to control relays
 
-# Overview
+## Overview
 
 This is a web server designed to provide access to a relay board. This project depends on [echttp](https://github.com/pascal-fb-martin/echttp) and [houseportal](https://github.com/pascal-fb-martin/houseportal).
 
@@ -11,7 +11,17 @@ The secondary intent is to share a relay board between multiple independent appl
 
 This way relay boards may be installed at convenient points across the home, and be accessed by separate applications independently of the relays or applications physical locations.
 
-# Hardware
+## Installation.
+
+* Install the OpenSSL development package(s).
+* Install [echttp](https://github.com/pascal-fb-martin/echttp).
+* Install [houseportal](https://github.com/pascal-fb-martin/houseportal).
+* Clone this GitHub repository.
+* make
+* sudo make install
+* Edit /etc/house/relays.json (see below)
+
+## Hardware
 
 The typical hardware supported by this applications are relay boards controlled through 5V TTL digital pins. These are wired to the digital I/O pins of a Raspberry Pi, Odroid or other small Linux computers. Depending on the model, these board are either controlled using open-drain outputs (active low) or 3-state outputs (active high).
 
@@ -41,7 +51,7 @@ If on is 0, the output is configured as open-drain, the on command sets the outp
 
 If on is 1, the output is configured as 3-state, the on command sets the output to 1, and the off command sets the output to 0.
 
-# Web API
+## Web API
 
 The API supported by this server is designed to be as generic as possible. The goal is to reuse the same API for different classes of hardware in the future. Each relay is accessed by a name, which is independent of the actual wiring between the relay board and the computer.
 
