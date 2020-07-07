@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include "echttp_json.h"
 #include "echttp_static.h"
@@ -63,13 +64,19 @@ static const char *relays_status (const char *method, const char *uri,
     static char buffer[65537];
     JsonToken token[1024];
     char pool[65537];
+    char host[256];
     int count = houserelays_gpio_count();
     int i;
+
+    gethostname (host, sizeof(host));
 
     JsonContext context = echttp_json_start (token, 1024, pool, 65537);
 
     int root = echttp_json_add_object (context, 0, 0);
-    int container = echttp_json_add_object (context, root, "status");
+    int top = echttp_json_add_object (context, root, "relays");
+    echttp_json_add_integer (context, top, "timestamp", (long)time(0));
+    echttp_json_add_string (context, top, "host", host);
+    int container = echttp_json_add_object (context, top, "status");
 
     for (i = 0; i < count; ++i) {
         time_t pulsed = houserelays_gpio_deadline(i);
@@ -141,21 +148,27 @@ static const char *relays_set (const char *method, const char *uri,
     return relays_status (method, uri, data, length);
 }
 
-static const char *relays_history (const char *method, const char *uri,
-                                      const char *data, int length) {
+static const char *relays_recent (const char *method, const char *uri,
+                                  const char *data, int length) {
     static char buffer[81920];
     static JsonToken token[8192];
     static char pool[81920];
+    char host[256];
     time_t timestamp;
     char *name;
     char *command;
     int pulse;
     int i = houserelays_history_first (&timestamp, &name, &command, &pulse);
 
+    gethostname (host, sizeof(host));
+
     JsonContext context = echttp_json_start (token, 8192, pool, 81920);
 
     int root = echttp_json_add_object (context, 0, 0);
-    int container = echttp_json_add_array (context, root, "history");
+    int top = echttp_json_add_object (context, root, "relays");
+    echttp_json_add_integer (context, top, "timestamp", (long)time(0));
+    echttp_json_add_string (context, top, "host", host);
+    int container = echttp_json_add_array (context, top, "recent");
 
     while (i >= 0) {
         int event = echttp_json_add_object (context, container, 0);
@@ -237,8 +250,8 @@ int main (int argc, const char **argv) {
     }
 
     echttp_route_uri ("/relays/status", relays_status);
-    echttp_route_uri ("/relays/set", relays_set);
-    echttp_route_uri ("/relays/history", relays_history);
+    echttp_route_uri ("/relays/set",    relays_set);
+    echttp_route_uri ("/relays/recent", relays_recent);
 
     echttp_route_match ("/relays/config", relays_config);
 

@@ -76,7 +76,7 @@ Set the specified relay point to the specified state. If the pulse parameter is 
 
 The point name "all" denotes all points served by this web server. Use with caution as the service maybe shared between multiple applications. It is intended for maintenance only.
 ```
-GET /relays/history
+GET /relays/recent
 ```
 Return a JSON array of all the recent relay state changes. The history is not saved to disk and the server keeps only a fixed number of state changes.
 ```
