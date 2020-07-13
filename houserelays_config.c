@@ -70,7 +70,7 @@
 
 #define CONFIGMAXSIZE 1024
 
-static JsonToken ConfigParsed[CONFIGMAXSIZE];
+static ParserToken ConfigParsed[CONFIGMAXSIZE];
 static int   ConfigTokenCount = 0;
 static char *ConfigText;
 static int   ConfigTextSize = 0;
@@ -154,32 +154,32 @@ int houserelays_config_find (int parent, const char *path, int type) {
 }
 
 const char *houserelays_config_string (int parent, const char *path) {
-    int i = houserelays_config_find(parent, path, JSON_STRING);
+    int i = houserelays_config_find(parent, path, PARSER_STRING);
     return (i >= 0) ? ConfigParsed[i].value.string : 0;
 }
 
 int houserelays_config_integer (int parent, const char *path) {
-    int i = houserelays_config_find(parent, path, JSON_INTEGER);
+    int i = houserelays_config_find(parent, path, PARSER_INTEGER);
     return (i >= 0) ? ConfigParsed[i].value.integer : 0;
 }
 
 int houserelays_config_boolean (int parent, const char *path) {
-    int i = houserelays_config_find(parent, path, JSON_BOOL);
+    int i = houserelays_config_find(parent, path, PARSER_BOOL);
     return (i >= 0) ? ConfigParsed[i].value.bool : 0;
 }
 
 int houserelays_config_array (int parent, const char *path) {
-    return houserelays_config_find(parent, path, JSON_ARRAY);
+    return houserelays_config_find(parent, path, PARSER_ARRAY);
 }
 
 int houserelays_config_array_length (int array) {
     if (array < 0
             || array >= ConfigTokenCount
-            || ConfigParsed[array].type != JSON_ARRAY) return 0;
+            || ConfigParsed[array].type != PARSER_ARRAY) return 0;
     return ConfigParsed[array].length;
 }
 
 int houserelays_config_object (int parent, const char *path) {
-    return houserelays_config_find(parent, path, JSON_OBJECT);
+    return houserelays_config_find(parent, path, PARSER_OBJECT);
 }
 

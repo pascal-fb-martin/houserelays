@@ -62,7 +62,7 @@ static void hc_help (const char *argv0) {
 static const char *relays_status (const char *method, const char *uri,
                                    const char *data, int length) {
     static char buffer[65537];
-    JsonToken token[1024];
+    ParserToken token[1024];
     char pool[65537];
     char host[256];
     int count = houserelays_gpio_count();
@@ -70,7 +70,7 @@ static const char *relays_status (const char *method, const char *uri,
 
     gethostname (host, sizeof(host));
 
-    JsonContext context = echttp_json_start (token, 1024, pool, 65537);
+    ParserContext context = echttp_json_start (token, 1024, pool, 65537);
 
     int root = echttp_json_add_object (context, 0, 0);
     int top = echttp_json_add_object (context, root, "relays");
@@ -151,7 +151,7 @@ static const char *relays_set (const char *method, const char *uri,
 static const char *relays_recent (const char *method, const char *uri,
                                   const char *data, int length) {
     static char buffer[81920];
-    static JsonToken token[8192];
+    static ParserToken token[8192];
     static char pool[81920];
     char host[256];
     time_t timestamp;
@@ -162,7 +162,7 @@ static const char *relays_recent (const char *method, const char *uri,
 
     gethostname (host, sizeof(host));
 
-    JsonContext context = echttp_json_start (token, 8192, pool, 81920);
+    ParserContext context = echttp_json_start (token, 8192, pool, 81920);
 
     int root = echttp_json_add_object (context, 0, 0);
     int top = echttp_json_add_object (context, root, "relays");
