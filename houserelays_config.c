@@ -82,6 +82,7 @@ static const char *houserelays_config_refresh (const char *file) {
 
     if (ConfigText) echttp_parser_free (ConfigText);
     ConfigText = echttp_parser_load (file);
+    ConfigTextLength = strlen(ConfigText);
 
     ConfigTokenCount = CONFIGMAXSIZE;
     return echttp_json_parse (ConfigText, ConfigParsed, &ConfigTokenCount);
