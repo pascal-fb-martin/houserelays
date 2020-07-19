@@ -78,10 +78,17 @@ static int   ConfigTextLength = 0;
 
 static const char *ConfigFile = "/etc/house/relays.json";
 
+static const char *houserelays_config_refresh (const char *file) {
+
+    if (ConfigText) echttp_parser_free (ConfigText);
+    ConfigText = echttp_parser_load (file);
+
+    ConfigTokenCount = CONFIGMAXSIZE;
+    return echttp_json_parse (ConfigText, ConfigParsed, &ConfigTokenCount);
+}
+
 const char *houserelays_config_load (int argc, const char **argv) {
 
-    struct stat filestat;
-    int fd;
     int i;
 
     for (i = 1; i < argc; ++i) {
@@ -90,51 +97,19 @@ const char *houserelays_config_load (int argc, const char **argv) {
         }
     }
 
-    if (stat (ConfigFile, &filestat)) return "cannot access config file";
-
-    if (filestat.st_size <= 0) return "empty config file";
-
-    if (filestat.st_size >= ConfigTextSize) {
-        ConfigTextSize = filestat.st_size + 128;
-        ConfigText = (char *) realloc (ConfigText, ConfigTextSize);
-    }
-    ConfigTextLength = filestat.st_size;
-
-    fd = open (ConfigFile, O_RDONLY);
-    if (fd < 0) return "cannot open config file";
-
-    if (read (fd, ConfigText, filestat.st_size) != filestat.st_size) {
-        return "cannot read config file";
-    }
-    close(fd);
-    ConfigText[filestat.st_size] = 0; // Terminate the JSON string.
-
-    ConfigTokenCount = CONFIGMAXSIZE;
-    return echttp_json_parse (ConfigText, ConfigParsed, &ConfigTokenCount);
+    return houserelays_config_refresh (ConfigFile);
 }
 
 const char *houserelays_config_update (const char *text) {
 
-    const char *error;
     int fd;
-
-    ConfigTextLength = strlen(text);
-    if (ConfigTextLength >= ConfigTextSize) {
-        ConfigTextSize = ConfigTextLength + 128;
-        ConfigText = (char *) realloc (ConfigText, ConfigTextSize);
-    }
-    strncpy (ConfigText, text, ConfigTextSize);
-
-    ConfigTokenCount = CONFIGMAXSIZE;
-    error = echttp_json_parse (ConfigText, ConfigParsed, &ConfigTokenCount);
-    if (error) return error;
 
     fd = open (ConfigFile, O_WRONLY+O_CREAT, 0777);
     if (fd >= 0) {
         write (fd, text, ConfigTextLength);
         close (fd);
     }
-    return 0;
+    return houserelays_config_refresh (ConfigFile);
 }
 
 int houserelays_config_file (void) {
