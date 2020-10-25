@@ -253,7 +253,7 @@ int main (int argc, const char **argv) {
     echttp_route_uri ("/relays/set",    relays_set);
     echttp_route_uri ("/relays/recent", relays_recent);
 
-    echttp_route_match ("/relays/config", relays_config);
+    echttp_route_uri ("/relays/config", relays_config);
 
     echttp_static_route ("/relays", "/usr/share/house/public/relays");
     echttp_background (&hc_background);
