@@ -73,7 +73,7 @@ static const char *relays_status (const char *method, const char *uri,
     ParserContext context = echttp_json_start (token, 1024, pool, 65537);
 
     int root = echttp_json_add_object (context, 0, 0);
-    int top = echttp_json_add_object (context, root, "relays");
+    int top = echttp_json_add_object (context, root, "control");
     echttp_json_add_integer (context, top, "timestamp", (long)time(0));
     echttp_json_add_string (context, top, "host", host);
     int container = echttp_json_add_object (context, top, "status");
@@ -165,7 +165,7 @@ static const char *relays_recent (const char *method, const char *uri,
     ParserContext context = echttp_json_start (token, 8192, pool, 81920);
 
     int root = echttp_json_add_object (context, 0, 0);
-    int top = echttp_json_add_object (context, root, "relays");
+    int top = echttp_json_add_object (context, root, "control");
     echttp_json_add_integer (context, top, "timestamp", (long)time(0));
     echttp_json_add_string (context, top, "host", host);
     int container = echttp_json_add_array (context, top, "recent");
@@ -210,7 +210,7 @@ static void hc_background (int fd, int mode) {
     time_t now = time(0);
 
     if (use_houseportal) {
-        static const char *path[] = {"/relays"};
+        static const char *path[] = {"control:/relays"};
         if (now >= LastRenewal + 60) {
             if (LastRenewal > 0)
                 houseportal_renew();

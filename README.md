@@ -11,6 +11,8 @@ The secondary intent is to share a relay board between multiple independent appl
 
 This way relay boards may be installed at convenient points across the home, and be accessed by separate applications independently of the relays or applications physical locations.
 
+This program implements the House control web service and API.
+
 ## Installation.
 
 * Install the OpenSSL development package(s).
@@ -52,6 +54,8 @@ If on is 0, the output is configured as open-drain, the on command sets the outp
 If on is 1, the output is configured as 3-state, the on command sets the output to 1, and the off command sets the output to 0.
 
 ## Web API
+
+This program implements the House control web API.
 
 The API supported by this server is designed to be as generic as possible. The goal is to reuse the same API for different classes of hardware in the future. Each relay is accessed by a name, which is independent of the actual wiring between the relay board and the computer.
 
