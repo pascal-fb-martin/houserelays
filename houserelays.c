@@ -214,7 +214,7 @@ int main (int argc, const char **argv) {
 
     echttp_route_uri ("/relays/config", relays_config);
 
-    echttp_static_route ("/relays", "/usr/local/share/house/public/relays");
+    echttp_static_route ("/", "/usr/local/share/house/public");
     echttp_background (&hc_background);
     houselog_event (time(0), "SERVICE", "relays", "START", "ON %s", HostName);
     echttp_loop();
