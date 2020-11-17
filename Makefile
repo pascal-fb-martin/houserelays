@@ -27,6 +27,10 @@ install:
 	cp init.debian /etc/init.d/houserelays
 	chown root:root /usr/local/bin/houserelays /etc/init.d/houserelays
 	chmod 755 /usr/local/bin/houserelays /etc/init.d/houserelays
+	mkdir -p /usr/local/share/house/public/relays
+	cp public/* /usr/local/share/house/public/relays
+	chown root:root /usr/local/share/house/public/relays/*
+	chmod 644 /usr/local/share/house/public/relays/*
 	if [ -e /etc/house/relays.json ] ; then cp config.json /etc/house/relays.json ; fi
 	chown root:root /etc/house/relays.json
 	chmod 755 /etc/house/relays.json
