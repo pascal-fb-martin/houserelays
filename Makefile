@@ -1,5 +1,5 @@
 
-OBJS= houserelays.o houserelays_config.o houserelays_gpio.o houserelays_history.o
+OBJS= houserelays.o houserelays_config.o houserelays_gpio.o
 LIBOJS=
 
 all: houserelays

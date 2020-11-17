@@ -32,13 +32,14 @@
 #include "echttp_json.h"
 #include "echttp_static.h"
 #include "houseportalclient.h"
+#include "houselog.h"
 
 #include "houserelays.h"
-#include "houserelays_history.h"
 #include "houserelays_config.h"
 #include "houserelays_gpio.h"
 
-static int use_houseportal = 0;
+static int  UseHousePortal = 0;
+static char HostName[256];
 
 static void hc_help (const char *argv0) {
 
@@ -64,18 +65,15 @@ static const char *relays_status (const char *method, const char *uri,
     static char buffer[65537];
     ParserToken token[1024];
     char pool[65537];
-    char host[256];
     int count = houserelays_gpio_count();
     int i;
-
-    gethostname (host, sizeof(host));
 
     ParserContext context = echttp_json_start (token, 1024, pool, 65537);
 
     int root = echttp_json_add_object (context, 0, 0);
     int top = echttp_json_add_object (context, root, "control");
     echttp_json_add_integer (context, top, "timestamp", (long)time(0));
-    echttp_json_add_string (context, top, "host", host);
+    echttp_json_add_string (context, top, "host", HostName);
     int container = echttp_json_add_object (context, top, "status");
 
     for (i = 0; i < count; ++i) {
@@ -148,46 +146,6 @@ static const char *relays_set (const char *method, const char *uri,
     return relays_status (method, uri, data, length);
 }
 
-static const char *relays_recent (const char *method, const char *uri,
-                                  const char *data, int length) {
-    static char buffer[81920];
-    static ParserToken token[8192];
-    static char pool[81920];
-    char host[256];
-    time_t timestamp;
-    char *name;
-    char *command;
-    int pulse;
-    int i = houserelays_history_first (&timestamp, &name, &command, &pulse);
-
-    gethostname (host, sizeof(host));
-
-    ParserContext context = echttp_json_start (token, 8192, pool, 81920);
-
-    int root = echttp_json_add_object (context, 0, 0);
-    int top = echttp_json_add_object (context, root, "control");
-    echttp_json_add_integer (context, top, "timestamp", (long)time(0));
-    echttp_json_add_string (context, top, "host", host);
-    int container = echttp_json_add_array (context, top, "recent");
-
-    while (i >= 0) {
-        int event = echttp_json_add_object (context, container, 0);
-        echttp_json_add_integer (context, event, "time", (long)timestamp);
-        echttp_json_add_string (context, event, "point", name);
-        echttp_json_add_string (context, event, "cmd", command);
-        if (pulse) echttp_json_add_integer (context, event, "pulse", pulse);
-
-        i = houserelays_history_next (i, &timestamp, &name, &command, &pulse);
-    }
-    const char *error = echttp_json_export (context, buffer, 81920);
-    if (error) {
-        echttp_error (500, error);
-        return "";
-    }
-    echttp_content_type_json ();
-    return buffer;
-}
-
 static const char *relays_config (const char *method, const char *uri,
                                    const char *data, int length) {
 
@@ -209,7 +167,7 @@ static void hc_background (int fd, int mode) {
     static time_t LastRenewal = 0;
     time_t now = time(0);
 
-    if (use_houseportal) {
+    if (UseHousePortal) {
         static const char *path[] = {"control:/relays"};
         if (now >= LastRenewal + 60) {
             if (LastRenewal > 0)
@@ -219,12 +177,11 @@ static void hc_background (int fd, int mode) {
             LastRenewal = now;
         }
     }
-    houserelays_gpio_periodic();
+    houserelays_gpio_periodic(now);
+    houselog_background (now);
 }
 
 int main (int argc, const char **argv) {
-
-    const char *error;
 
     // These strange statements are to make sure that fds 0 to 2 are
     // reserved, since this application might output some errors.
@@ -233,30 +190,33 @@ int main (int argc, const char **argv) {
     open ("/dev/null", O_RDONLY);
     dup(open ("/dev/null", O_WRONLY));
 
+    gethostname (HostName, sizeof(HostName));
+
     echttp_open (argc, argv);
     if (echttp_dynamic_port()) {
         houseportal_initialize (argc, argv);
-        use_houseportal = 1;
+        UseHousePortal = 1;
     }
-    error = houserelays_config_load (argc, argv);
+    houselog_initialize ("relays", argc, argv);
+    const char *error = houserelays_config_load (argc, argv);
     if (error) {
-        fprintf (stderr, "Cannot load configuration: %s\n", error);
-        exit(1);
+        houselog_trace
+            (HOUSE_FAILURE, "CONFIG", "Cannot load configuration: %s\n", error);
     }
     error = houserelays_gpio_configure (argc, argv);
     if (error) {
-        fprintf (stderr, "Cannot initialize GPIO: %s\n", error);
-        exit(1);
+        houselog_trace
+            (HOUSE_FAILURE, "CONFIG", "Cannot configure GPIO: %s\n", error);
     }
 
     echttp_route_uri ("/relays/status", relays_status);
     echttp_route_uri ("/relays/set",    relays_set);
-    echttp_route_uri ("/relays/recent", relays_recent);
 
     echttp_route_uri ("/relays/config", relays_config);
 
-    echttp_static_route ("/relays", "/usr/share/house/public/relays");
+    echttp_static_route ("/relays", "/usr/local/share/house/public/relays");
     echttp_background (&hc_background);
+    houselog_event (time(0), "SERVICE", "relays", "START", "ON %s", HostName);
     echttp_loop();
 }
 

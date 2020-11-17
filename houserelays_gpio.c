@@ -66,9 +66,9 @@
 #include <stdlib.h>
 #include <gpiod.h>
 
+#include "houselog.h"
 #include "houserelays.h"
 #include "houserelays_config.h"
-#include "houserelays_history.h"
 #include "houserelays_gpio.h"
 
 struct RelayMap {
@@ -170,11 +170,14 @@ int houserelays_gpio_get (int point) {
 
 int houserelays_gpio_set (int point, int state, int pulse) {
 
+    time_t now = time(0);
     const char *namedstate = state?"on":"off";
 
     if (echttp_isdebug()) {
-        if (pulse) fprintf (stderr, "set %s to %s at %ld (pulse %ds)\n", Relays[point].name, namedstate, time(0), pulse);
-        else       fprintf (stderr, "set %s to %s at %ld\n", Relays[point].name, namedstate, time(0));
+        if (pulse)
+            fprintf (stderr, "set %s to %s at %ld (pulse %ds)\n", Relays[point].name, namedstate, now, pulse);
+        else
+            fprintf (stderr, "set %s to %s at %ld\n", Relays[point].name, namedstate, now);
     }
     if (point < 0 || point > RelaysCount) return 0;
     gpiod_line_set_value(Relays[point].line,
@@ -184,14 +187,14 @@ int houserelays_gpio_set (int point, int state, int pulse) {
     else
         Relays[point].deadline = 0;
     Relays[point].commanded = state;
-    houserelays_history_add (Relays[point].name, namedstate, pulse);
+    houselog_event (now, "GPIO", Relays[point].name, namedstate,
+                    "FOR %d SECONDS", pulse);
     return 1;
 }
 
-void houserelays_gpio_periodic (void) {
-    int i;
-    time_t now = time(0);
+void houserelays_gpio_periodic (time_t now) {
 
+    int i;
     for (i = 0; i < RelaysCount; ++i) {
         if (Relays[i].deadline > 0 && now >= Relays[i].deadline) {
             houserelays_gpio_set (i, 1 - Relays[i].commanded, 0);

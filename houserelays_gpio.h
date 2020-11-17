@@ -32,5 +32,5 @@ time_t houserelays_gpio_deadline  (int point);
 int    houserelays_gpio_get       (int point);
 int    houserelays_gpio_set       (int point, int state, int pulse);
 
-void houserelays_gpio_periodic (void);
+void houserelays_gpio_periodic (time_t now);
 
