@@ -186,9 +186,13 @@ int houserelays_gpio_set (int point, int state, int pulse) {
         Relays[point].deadline = time(0) + pulse;
         houselog_event (now, "GPIO", Relays[point].name, namedstate,
                         "FOR %d SECONDS", pulse);
+    } else if (pulse < 0) {
+        Relays[point].deadline = 0;
+        houselog_event (now, "GPIO", Relays[point].name, namedstate,
+                        "END OF PULSE");
     } else {
         Relays[point].deadline = 0;
-        houselog_event (now, "GPIO", Relays[point].name, namedstate, "");
+        houselog_event (now, "GPIO", Relays[point].name, namedstate, "LATCHED");
     }
     Relays[point].commanded = state;
     return 1;
@@ -199,7 +203,7 @@ void houserelays_gpio_periodic (time_t now) {
     int i;
     for (i = 0; i < RelaysCount; ++i) {
         if (Relays[i].deadline > 0 && now >= Relays[i].deadline) {
-            houserelays_gpio_set (i, 1 - Relays[i].commanded, 0);
+            houserelays_gpio_set (i, 1 - Relays[i].commanded, -1);
         }
     }
 }
