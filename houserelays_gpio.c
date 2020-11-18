@@ -37,7 +37,16 @@
  *
  * const char *houserelays_gpio_name (int point);
  *
- *    Return the name of a relay point.
+ *    Return the name of a relay point. The point name serves as an
+ *    identifier for application access.
+ *
+ * const char *houserelays_gpio_description (int point);
+ *
+ *    Return the point's description. This is just text intended to help
+ *    the user remember what the point is, for example it may match labels
+ *    on the hardware. Most equipment labels each relay 1, 2, 3, etc. The
+ *    description would match this. The application should not assume that
+ *    the description text follow some specific semantic or syntax.
  *
  * int houserelays_gpio_commanded (int point);
  * time_t houserelays_gpio_deadline (int point);
@@ -73,6 +82,7 @@
 
 struct RelayMap {
     const char *name;
+    const char *desc;
     int gpio;
     int on;
     int off;
@@ -122,6 +132,7 @@ const char *houserelays_gpio_refresh (void) {
         point = houserelays_config_object (relays, path);
         if (point > 0) {
             Relays[i].name = houserelays_config_string (point, ".name");
+            Relays[i].desc = houserelays_config_string (point, ".description");
             Relays[i].gpio = houserelays_config_integer (point, ".gpio");
             Relays[i].on  = houserelays_config_integer (point, ".on") & 1;
             if (echttp_isdebug()) fprintf (stderr, "found point %s, gpio %d, on %d\n", Relays[i].name, Relays[i].gpio, Relays[i].on);
@@ -151,6 +162,11 @@ int houserelays_gpio_count (void) {
 const char *houserelays_gpio_name (int point) {
     if (point < 0 || point > RelaysCount) return 0;
     return Relays[point].name;
+}
+
+const char *houserelays_gpio_description (int point) {
+    if (point < 0 || point > RelaysCount) return 0;
+    return Relays[point].desc;
 }
 
 int houserelays_gpio_commanded (int point) {
