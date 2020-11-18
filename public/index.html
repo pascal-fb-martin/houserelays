@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel=stylesheet type="text/css" href="/house.css" title="House">
+<script src="/sprinkler/sprinklerlib.js"></script>
+<script>
+function relayShowStatus (response) {
+    var state = response.control.status;
+    for (const [key, value] of Object.entries(state)) {
+        var state = document.getElementById ('state-'+key);
+        var button = document.getElementById ('button-'+key);
+        if (value.state == button.controlOn) {
+            state.innerHTML = 'ON';
+            button.innerHTML = 'OFF';
+            button.controlState = 'off';
+        } else {
+            state.innerHTML = 'OFF';
+            button.innerHTML = 'ON';
+            button.controlState = 'on';
+        }
+        button.disabled = false;
+    }
+}
+
+function relayStatus () {
+    var command = new XMLHttpRequest();
+    command.open("GET", "/relays/status");
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            relayShowStatus (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
+function controlClick () {
+    var point = this.controlName;
+    var state = this.controlState;
+    var command = new XMLHttpRequest();
+    command.open("GET", "/relays/set?point="+point+"&state="+state);
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            relayShowStatus (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
+window.onload = function() {
+
+   function relayShowConfig (response) {
+      var iolist = document.getElementsByClassName ('iolist')[0];
+      var points = response.relays.points;
+      for (var i = 0; i < points.length; i++) {
+           var point = points[i];
+           var outer = document.createElement("tr");
+
+           var inner = document.createElement("td");
+           var label = document.createElement("span");
+           label.innerHTML = point.name+': ';
+           inner.appendChild(label);
+           outer.appendChild(inner);
+
+           inner = document.createElement("td");
+           label = document.createElement("span");
+           label.innerHTML = ''+point.gpio;
+           inner.appendChild(label);
+           outer.appendChild(inner);
+
+           inner = document.createElement("td");
+           label = document.createElement("span");
+           label.innerHTML = ''+point.on;
+           inner.appendChild(label);
+           outer.appendChild(inner);
+
+           inner = document.createElement("td");
+           label = document.createElement("span");
+           label.innerHTML = '(wait)';
+           label.id = 'state-'+point.name;
+           inner.appendChild(label);
+           outer.appendChild(inner);
+
+           inner = document.createElement("td");
+           var button = document.createElement("button");
+           button.innerHTML = '(wait)';
+           button.disabled = true;
+           button.id = 'button-'+point.name;
+           button.onclick = controlClick;
+           button.controlName = point.name;
+           button.controlOn = point.on;
+           inner.appendChild(button);
+           outer.appendChild(inner);
+           iolist.appendChild(outer);
+       }
+   }
+
+   function relayConfig () {
+       var command = new XMLHttpRequest();
+       command.open("GET", "/relays/config");
+       command.onreadystatechange = function () {
+           if (command.readyState === 4 && command.status === 200) {
+               relayShowConfig (JSON.parse(command.responseText));
+               relayStatus();
+               setInterval (relayStatus, 1000);
+           }
+       }
+       command.send(null);
+   }
+   relayConfig();
+};
+</script>
+<head>
+   <title>Relays</title>
+</head>
+<body>
+   <table class="iolist">
+      <tr>
+         <th>NAME</th>
+         <th>GPIO</th>
+         <th>ON</th>
+         <th>STATE</th>
+         <th>CONTROL</th>
+      </tr>
+   </table>
+</body>
+</html>
+
