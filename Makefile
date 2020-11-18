@@ -31,7 +31,7 @@ install:
 	cp public/* /usr/local/share/house/public/relays
 	chown root:root /usr/local/share/house/public/relays/*
 	chmod 644 /usr/local/share/house/public/relays/*
-	if [ -e /etc/house/relays.json ] ; then cp config.json /etc/house/relays.json ; fi
+	if [ ! -e /etc/house/relays.json ] ; then cp config.json /etc/house/relays.json ; fi
 	chown root:root /etc/house/relays.json
 	chmod 755 /etc/house/relays.json
 	touch /etc/default/houserelays

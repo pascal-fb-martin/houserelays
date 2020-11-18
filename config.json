@@ -1,2 +1,2 @@
-{"relays":{"iochip":0,"points":[{"name":"relay1","gpio":4,"on":0},{"name":"relay2","gpio":17,"on":0},{"name":"relay3","gpio":27,"on":0},{"name":"relay4","gpio":22,"on":0},{"name":"relay5","gpio":18,"on":0},{"name":"relay6","gpio":23,"on":0},{"name":"relay7","gpio":24,"on":0},{"name":"relay8","gpio":25,"on":0}]}}
+{"relays":{"iochip":0,"points":[{"name":"relay1","description":"Relay 1","gpio":4,"on":0},{"name":"relay2","description":"Relay 2","gpio":17,"on":0},{"name":"relay3","gpio":27,"on":0},{"name":"relay4","gpio":22,"on":0},{"name":"relay5","gpio":18,"on":0},{"name":"relay6","gpio":23,"on":0},{"name":"relay7","gpio":24,"on":0},{"name":"relay8","gpio":25,"on":0}]}}
 
