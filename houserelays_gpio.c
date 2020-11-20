@@ -135,7 +135,7 @@ const char *houserelays_gpio_refresh (void) {
             Relays[i].desc = houserelays_config_string (point, ".description");
             Relays[i].gpio = houserelays_config_integer (point, ".gpio");
             Relays[i].on  = houserelays_config_integer (point, ".on") & 1;
-            if (echttp_isdebug()) fprintf (stderr, "found point %s, gpio %d, on %d\n", Relays[i].name, Relays[i].gpio, Relays[i].on);
+            if (echttp_isdebug()) fprintf (stderr, "found point %s, gpio %d, on %d %s\n", Relays[i].name, Relays[i].gpio, Relays[i].on, Relays[i].desc);
 
             Relays[i].off = 1 - Relays[i].on;
             Relays[i].line = gpiod_chip_get_line (RelayChip, Relays[i].gpio);

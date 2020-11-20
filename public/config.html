@@ -19,9 +19,9 @@ function saveConfig () {
         var prefix = 'relay_'+i+'_';
         var point = new Object();
         point.name = form.iolistform[prefix+'name'].value;
-        point.gpio = form.iolistform[prefix+'gpio'].value;
-        point.on   = form.iolistform[prefix+'on'].value;
-        point.desc = form.iolistform[prefix+'desc'].value;
+        point.gpio = parseInt(form.iolistform[prefix+'gpio'].value);
+        point.on   = parseInt(form.iolistform[prefix+'on'].value);
+        point.description = form.iolistform[prefix+'desc'].value;
         newconfig.relays.points[i] = point;
     }
 
