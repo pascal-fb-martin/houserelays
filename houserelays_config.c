@@ -107,7 +107,7 @@ const char *houserelays_config_update (const char *text) {
 
     fd = open (ConfigFile, O_WRONLY|O_TRUNC|O_CREAT, 0777);
     if (fd >= 0) {
-        write (fd, text, ConfigTextLength);
+        write (fd, text, strlen(text));
         close (fd);
     }
     return houserelays_config_refresh (ConfigFile);
