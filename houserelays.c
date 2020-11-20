@@ -192,6 +192,9 @@ int main (int argc, const char **argv) {
 
     gethostname (HostName, sizeof(HostName));
 
+    static const char *defaultoptions[] = {"-http-service=dynamic"};
+    echttp_defaults (1, defaultoptions);
+
     echttp_open (argc, argv);
     if (echttp_dynamic_port()) {
         houseportal_initialize (argc, argv);
