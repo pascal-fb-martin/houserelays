@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel=stylesheet type="text/css" href="/house.css" title="House">
+<script>
+
+var countIoShown = 0;
+
+function saveConfig () {
+
+    var form = document.forms;
+    var newconfig = new Object();
+    newconfig.relays = new Object();
+    newconfig.relays.iochip = 0; // For now..
+    newconfig.relays.points = new Array();
+
+    for (var i = 0; i < countIoShown; ++i) {
+
+        var prefix = 'relay_'+i+'_';
+        var point = new Object();
+        point.name = form.iolistform[prefix+'name'].value;
+        point.gpio = form.iolistform[prefix+'gpio'].value;
+        point.on   = form.iolistform[prefix+'on'].value;
+        point.desc = form.iolistform[prefix+'desc'].value;
+        newconfig.relays.points[i] = point;
+    }
+
+    var command = new XMLHttpRequest();
+    command.open("POST", "/relays/config");
+    command.setRequestHeader('Content-Type', 'application/json');
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status !== 200) {
+            window.alert ('Operation failed (error '+command.status+')!');
+        }
+    }
+    command.send(JSON.stringify(newconfig));
+}
+
+function showRelay (name, gpio, on, description) {
+
+    var outer = document.createElement("tr");
+
+    var iolist = document.getElementsByClassName ('iolist')[0];
+    var prefix = 'relay_'+countIoShown+'_';
+    var inner = document.createElement("td");
+    var entry = document.createElement("input");
+    entry.type = 'text';
+    entry.name = prefix+'name';
+    entry.value = name;
+    entry.placeholder = 'Name';
+    inner.appendChild(entry);
+    outer.appendChild(inner);
+
+    inner = document.createElement("td");
+    entry = document.createElement("input");
+    entry.type = 'number';
+    entry.name = prefix+'gpio';
+    entry.min = 1;
+    entry.max = 99;
+    entry.value = gpio;
+    entry.placeholder = 'GPIO';
+    entry.inputmode = 'numeric';
+    inner.appendChild(entry);
+    outer.appendChild(inner);
+
+    inner = document.createElement("td");
+    entry = document.createElement("input");
+    entry.type = 'number';
+    entry.name = prefix+'on';
+    entry.min = 0;
+    entry.max = 1;
+    entry.value = on;
+    entry.placeholder = '0/1';
+    entry.inputmode = 'numeric';
+    inner.appendChild(entry);
+    outer.appendChild(inner);
+
+    inner = document.createElement("td");
+    entry = document.createElement("input");
+    entry.type = 'text';
+    entry.name = prefix+'desc';
+    entry.placeholder = 'Name';
+    if (description)
+        entry.value = description;
+    else
+        entry.value = '';
+    inner.appendChild(entry);
+    outer.appendChild(inner);
+
+    iolist.appendChild(outer);
+    countIoShown += 1;
+}
+
+function addConfig () {
+    showRelay ('', '', '', '');
+}
+
+function relayShowConfig (response) {
+   var iolist = document.getElementsByClassName ('iolist')[0];
+   var points = response.relays.points;
+   for (var i = 0; i < points.length; i++) {
+      var point = points[i];
+      if (!point.description) point.description = '';
+      showRelay (point.name, point.gpio, point.on, point.description);
+   }
+}
+
+function relayConfig () {
+    var command = new XMLHttpRequest();
+    command.open("GET", "/relays/config");
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            relayShowConfig (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
+window.onload = function() {
+   relayConfig();
+};
+</script>
+<head>
+   <title>Relays</title>
+</head>
+<body>
+   <table class="housetopcontainer">
+   <tr><td>
+   <table class="housetop">
+   <tr>
+   <td><a href="/relays/index.html">Relays</a></td>
+   <td><a href="/relays/events.html">Events</a></td>
+   <td><span>Config</span></td>
+   </tr>
+   </table>
+   </td></tr>
+   </table>
+   <form name="iolistform">
+   <table class="houselargetable iolist">
+      <tr>
+         <th>NAME</th>
+         <th>GPIO</th>
+         <th>ON</th>
+         <th>DESCRIPTION</th>
+      </tr>
+   </table>
+   </form>
+   <div class="housebuttons">
+      <button class="actionbutton" onclick="addConfig()">Add</button>
+      <button class="actionbutton" onclick="saveConfig()">Save</button>
+   </div>
+</body>
+</html>
+

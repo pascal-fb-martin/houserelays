@@ -63,18 +63,6 @@ window.onload = function() {
 
            inner = document.createElement("td");
            label = document.createElement("span");
-           label.innerHTML = ''+point.gpio;
-           inner.appendChild(label);
-           outer.appendChild(inner);
-
-           inner = document.createElement("td");
-           label = document.createElement("span");
-           label.innerHTML = ''+point.on;
-           inner.appendChild(label);
-           outer.appendChild(inner);
-
-           inner = document.createElement("td");
-           label = document.createElement("span");
            label.innerHTML = '(wait)';
            label.id = 'state-'+point.name;
            inner.appendChild(label);
@@ -123,14 +111,23 @@ window.onload = function() {
    <title>Relays</title>
 </head>
 <body>
-   <table class="iolist">
+   <table class="housetopcontainer">
+   <tr><td>
+   <table class="housetop">
+   <tr>
+   <td><span>Relays</span></td>
+   <td><a href="/relays/events.html">Events</a></td>
+   <td><a href="/relays/config.html">Config</a></td>
+   </tr>
+   </table>
+   </td></tr>
+   </table>
+   <table class="housewidetable iolist" border="0">
       <tr>
-         <th>NAME</th>
-         <th>GPIO</th>
-         <th>ON</th>
-         <th>STATE</th>
-         <th>CONTROL</th>
-         <th>DESCRIPTION</th>
+         <th width="10%">NAME</th>
+         <th width="10%">STATE</th>
+         <th width="10%">CONTROL</th>
+         <th width="70%">DESCRIPTION</th>
       </tr>
    </table>
 </body>

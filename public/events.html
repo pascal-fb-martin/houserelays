@@ -26,7 +26,7 @@ window.onload = function() {
 
       lastEventId = response.relays.latest;
 
-      var table = document.getElementsByClassName ('houseevent')[0];
+      var table = document.getElementsByClassName ('eventlist')[0];
       for (var i = table.childNodes.length - 1; i > 1; i--) {
          table.removeChild(table.childNodes[i]);
       }
@@ -77,8 +77,19 @@ window.onload = function() {
    <title></title>
 </head>
 <body>
+   <table class="housetopcontainer">
+   <tr><td>
+   <table class="housetop">
+   <tr>
+   <td><a href="/relays/index.html">Relays</a></td>
+   <td><span>Events</span></td>
+   <td><a href="/relays/config.html">Config</a></td>
+   </tr>
+   </table>
+   </td></tr>
+   </table>
    <h1><span class="hostname"></span></h1>
-   <table class="houseevent" border="0">
+   <table class="housewidetable eventlist" border="0">
       <tr>
          <th width="15%">Time</th>
          <th width="10%">Category</th>
