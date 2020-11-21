@@ -80,6 +80,15 @@ window.onload = function() {
 
            inner = document.createElement("td");
            label = document.createElement("span");
+           if (point.connection)
+               label.innerHTML = point.connection;
+           else
+               label.innerHTML = '';
+           inner.appendChild(label);
+           outer.appendChild(inner);
+
+           inner = document.createElement("td");
+           label = document.createElement("span");
            if (point.description)
                label.innerHTML = point.description;
            else
@@ -123,10 +132,11 @@ window.onload = function() {
    </table>
    <table class="housewidetable iolist" border="0">
       <tr>
-         <th width="10%">NAME</th>
+         <th width="14%">NAME</th>
          <th width="10%">STATE</th>
          <th width="10%">CONTROL</th>
-         <th width="70%">DESCRIPTION</th>
+         <th width="14%">CONNECTION</th>
+         <th width="52%">DESCRIPTION</th>
       </tr>
    </table>
 </body>

@@ -21,6 +21,7 @@ function saveConfig () {
         point.name = form.iolistform[prefix+'name'].value;
         point.gpio = parseInt(form.iolistform[prefix+'gpio'].value);
         point.on   = parseInt(form.iolistform[prefix+'on'].value);
+        point.connection = form.iolistform[prefix+'connect'].value;
         point.description = form.iolistform[prefix+'desc'].value;
         newconfig.relays.points[i] = point;
     }
@@ -36,7 +37,7 @@ function saveConfig () {
     command.send(JSON.stringify(newconfig));
 }
 
-function showRelay (name, gpio, on, description) {
+function showRelay (name, gpio, on, connection, description) {
 
     var outer = document.createElement("tr");
 
@@ -78,6 +79,18 @@ function showRelay (name, gpio, on, description) {
     inner = document.createElement("td");
     entry = document.createElement("input");
     entry.type = 'text';
+    entry.name = prefix+'connect';
+    entry.placeholder = 'Name';
+    if (connection)
+        entry.value = connection;
+    else
+        entry.value = '';
+    inner.appendChild(entry);
+    outer.appendChild(inner);
+
+    inner = document.createElement("td");
+    entry = document.createElement("input");
+    entry.type = 'text';
     entry.name = prefix+'desc';
     entry.placeholder = 'Name';
     if (description)
@@ -92,7 +105,7 @@ function showRelay (name, gpio, on, description) {
 }
 
 function addConfig () {
-    showRelay ('', '', '', '');
+    showRelay ('', '', '', '', '');
 }
 
 function relayShowConfig (response) {
@@ -101,7 +114,7 @@ function relayShowConfig (response) {
    for (var i = 0; i < points.length; i++) {
       var point = points[i];
       if (!point.description) point.description = '';
-      showRelay (point.name, point.gpio, point.on, point.description);
+      showRelay (point.name, point.gpio, point.on, point.connection, point.description);
    }
 }
 
@@ -141,6 +154,7 @@ window.onload = function() {
          <th>NAME</th>
          <th>GPIO</th>
          <th>ON</th>
+         <th>CONNECTION</th>
          <th>DESCRIPTION</th>
       </tr>
    </table>
