@@ -20,7 +20,11 @@ function saveConfig () {
         var point = new Object();
         point.name = form.iolistform[prefix+'name'].value;
         point.gpio = parseInt(form.iolistform[prefix+'gpio'].value);
-        point.on   = parseInt(form.iolistform[prefix+'on'].value);
+        var on = form.iolistform[prefix+'level'].value;
+        if (on === 'HIGH')
+            point.on = 1;
+        else
+            point.on = 0;
         point.connection = form.iolistform[prefix+'connect'].value;
         point.description = form.iolistform[prefix+'desc'].value;
         newconfig.relays.points[i] = point;
@@ -65,15 +69,21 @@ function showRelay (name, gpio, on, connection, description) {
     outer.appendChild(inner);
 
     inner = document.createElement("td");
-    entry = document.createElement("input");
-    entry.type = 'number';
-    entry.name = prefix+'on';
-    entry.min = 0;
-    entry.max = 1;
-    entry.value = on;
-    entry.placeholder = '0/1';
-    entry.inputmode = 'numeric';
-    inner.appendChild(entry);
+    var levelselect = document.createElement("select");
+    levelselect.name = prefix+'level';
+    var levelhigh = document.createElement("option");
+    levelhigh.value = 'HIGH';
+    levelhigh.innerHTML = 'Active High';
+    levelselect.appendChild(levelhigh);
+    levellow = document.createElement("option");
+    levellow.value = 'LOW';
+    levellow.innerHTML = 'Active Low';
+    levelselect.appendChild(levellow);
+    if (on)
+       levelhigh.selected = true;
+    else
+       levellow.selected = true;
+    inner.appendChild(levelselect);
     outer.appendChild(inner);
 
     inner = document.createElement("td");
@@ -153,7 +163,7 @@ window.onload = function() {
       <tr>
          <th>NAME</th>
          <th>GPIO</th>
-         <th>ON</th>
+         <th>LEVEL</th>
          <th>CONNECTION</th>
          <th>DESCRIPTION</th>
       </tr>
