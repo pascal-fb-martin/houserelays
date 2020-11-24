@@ -3,6 +3,20 @@
 <head>
 <link rel=stylesheet type="text/css" href="/house.css" title="House">
 <script>
+function relayShowStatus (response) {
+    document.getElementById('portal').href = 'http://'+response.proxy+'/index.html';
+}
+
+function relayStatus () {
+    var command = new XMLHttpRequest();
+    command.open("GET", "/relays/status");
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            relayShowStatus (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
 window.onload = function() {
 
    function newColumn (text) {
@@ -71,6 +85,7 @@ window.onload = function() {
 
    updateEvents();
    setInterval (function() {checkEvents()}, 1000);
+   relayStatus();
 }
 </script>
 <head>
@@ -81,6 +96,7 @@ window.onload = function() {
    <tr><td>
    <table class="housetop">
    <tr>
+   <td><a id="portal" href="/index.html">Portal</a></td>
    <td><a href="/relays/index.html">Relays</a></td>
    <td><span>Events</span></td>
    <td><a href="/relays/config.html">Config</a></td>
