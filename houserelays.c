@@ -72,9 +72,10 @@ static const char *relays_status (const char *method, const char *uri,
     ParserContext context = echttp_json_start (token, 1024, pool, 65537);
 
     int root = echttp_json_add_object (context, 0, 0);
+    echttp_json_add_string (context, root, "host", HostName);
+    echttp_json_add_string (context, root, "proxy", houseportal_server());
+    echttp_json_add_integer (context, root, "timestamp", (long)time(0));
     int top = echttp_json_add_object (context, root, "control");
-    echttp_json_add_integer (context, top, "timestamp", (long)time(0));
-    echttp_json_add_string (context, top, "host", HostName);
     int container = echttp_json_add_object (context, top, "status");
 
     for (i = 0; i < count; ++i) {
