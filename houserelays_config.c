@@ -98,7 +98,7 @@ const char *houserelays_config_load (int argc, const char **argv) {
             ConfigFile = strdup(argv[i] + 9);
         }
     }
-    houselog_event (time(0), "SYSTEM", "CONFIG", "LOAD", "FILE %s", ConfigFile);
+    houselog_event ("SYSTEM", "CONFIG", "LOAD", "FILE %s", ConfigFile);
     return houserelays_config_refresh (ConfigFile);
 }
 
@@ -110,7 +110,7 @@ const char *houserelays_config_update (const char *text) {
     if (fd >= 0) {
         write (fd, text, strlen(text));
         close (fd);
-        houselog_event (time(0), "SYSTEM", "CONFIG", "UPDATED", "FILE %s", ConfigFile);
+        houselog_event ("SYSTEM", "CONFIG", "UPDATED", "FILE %s", ConfigFile);
     }
     return houserelays_config_refresh (ConfigFile);
 }

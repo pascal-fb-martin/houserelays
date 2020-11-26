@@ -200,15 +200,15 @@ int houserelays_gpio_set (int point, int state, int pulse) {
                          state?Relays[point].on:Relays[point].off);
     if (pulse > 0) {
         Relays[point].deadline = time(0) + pulse;
-        houselog_event (now, "GPIO", Relays[point].name, namedstate,
+        houselog_event ("GPIO", Relays[point].name, namedstate,
                         "FOR %d SECONDS", pulse);
     } else if (pulse < 0) {
         Relays[point].deadline = 0;
-        houselog_event (now, "GPIO", Relays[point].name, namedstate,
+        houselog_event ("GPIO", Relays[point].name, namedstate,
                         "END OF PULSE");
     } else {
         Relays[point].deadline = 0;
-        houselog_event (now, "GPIO", Relays[point].name, namedstate, "LATCHED");
+        houselog_event ("GPIO", Relays[point].name, namedstate, "LATCHED");
     }
     Relays[point].commanded = state;
     return 1;
