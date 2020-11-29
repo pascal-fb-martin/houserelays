@@ -28,6 +28,8 @@ int houserelays_gpio_count (void);
 const char *houserelays_gpio_name (int point);
 const char *houserelays_gpio_description (int point);
 
+const char *houserelays_gpio_failure (int point);
+
 int    houserelays_gpio_commanded (int point);
 time_t houserelays_gpio_deadline  (int point);
 int    houserelays_gpio_get       (int point);

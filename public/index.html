@@ -11,16 +11,20 @@ function relayShowStatus (response) {
     for (const [key, value] of Object.entries(state)) {
         var state = document.getElementById ('state-'+key);
         var button = document.getElementById ('button-'+key);
-        if (value.state == button.controlOn) {
+        button.disabled = false;
+        if (value.state == 'on') {
             state.innerHTML = 'ON';
             button.innerHTML = 'OFF';
             button.controlState = 'off';
-        } else {
+        } else if (value.state == 'off') {
             state.innerHTML = 'OFF';
             button.innerHTML = 'ON';
             button.controlState = 'on';
+        } else {
+            state.innerHTML = value.state;
+            button.innerHTML = 'ON';
+            button.disabled = true;
         }
-        button.disabled = false;
     }
 }
 

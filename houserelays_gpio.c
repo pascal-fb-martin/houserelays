@@ -40,6 +40,10 @@
  *    Return the name of a relay point. The point name serves as an
  *    identifier for application access.
  *
+ * const char *houserelays_gpio_failure (int point);
+ *
+ *    Return a strig describing the failure, or a null pointer if healthy.
+ *
  * const char *houserelays_gpio_description (int point);
  *
  *    Return the point's description. This is just text intended to help
@@ -169,6 +173,10 @@ const char *houserelays_gpio_description (int point) {
     return Relays[point].desc;
 }
 
+const char *houserelays_gpio_failure (int point) {
+    return 0; // A GPIO never fail, or never report it to us..
+}
+
 int houserelays_gpio_commanded (int point) {
     if (point < 0 || point > RelaysCount) return 0;
     return Relays[point].commanded;
@@ -181,7 +189,8 @@ time_t houserelays_gpio_deadline (int point) {
 
 int houserelays_gpio_get (int point) {
     if (point < 0 || point > RelaysCount) return 0;
-    return gpiod_line_get_value (Relays[point].line);
+    int state = gpiod_line_get_value (Relays[point].line);
+    return (state == Relays[point].on);
 }
 
 int houserelays_gpio_set (int point, int state, int pulse) {
