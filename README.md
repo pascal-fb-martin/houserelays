@@ -36,12 +36,14 @@ The hardware interface is configured through the file /etc/house/relays.json. A 
             {
                 "name" : "relay1",
                 "gpio" : 4,
-                "on" : 0
+                "on" : 0,
+                "gear" : "valve"
             },
             {
                 "name" : "relay2",
                 "gpio" : 17,
-                "on" : 0
+                "on" : 0,
+                "gear" : "valve"
             }
         ]
     }
@@ -52,6 +54,8 @@ The iochip item must match the Linux gpiod chip index. The gpio item must match 
 If on is 0, the output is configured as open-drain, the on command sets the output to 0, and the off command sets the output to 1.
 
 If on is 1, the output is configured as 3-state, the on command sets the output to 1, and the off command sets the output to 0.
+
+The gear attribute is used by applications to filter which control points to show on their user interface. The typical values are valve (irrigation) and light.
 
 ## Web API
 
@@ -71,7 +75,7 @@ The basic services included are:
 ```
 GET /relays/status
 ```
-Returns a status JSON object that lists each relay by name. Each relay is itself an object with a state element and an optional pulse element. The state is either on or 1 (active), or else off or 0 (inactive). The pulse element is present if there is a pulse timer active (see below for more information about pulses) and indicates the remaining number of seconds during which the current statei will be maintained.
+Returns a status JSON object that lists each relay by name. Each relay is itself an object with state, command and gear elements and an optional pulse element. The state and commandelements are either on or 1 (active), or else off or 0 (inactive). The pulse element is present if there is a pulse timer active (see below for more information about pulses) and indicates the remaining number of seconds during which the current state will be maintained.
 ```
 GET /relays/set?point=NAME&state=off|0|on|1
 GET /relays/set?point=NAME&state=off|0|on|1&pulse=N
