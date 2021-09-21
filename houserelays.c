@@ -84,12 +84,15 @@ static const char *relays_status (const char *method, const char *uri,
         const char *status = houserelays_gpio_failure(i);
         if (!status) status = houserelays_gpio_get(i)?"on":"off";
         const char *commanded = houserelays_gpio_commanded(i)?"on":"off";
+        const char *gear = houserelays_gpio_gear(i);
 
         int point = echttp_json_add_object (context, container, name);
         echttp_json_add_string (context, point, "state", status);
         echttp_json_add_string (context, point, "command", commanded);
         if (pulsed)
             echttp_json_add_integer (context, point, "pulse", (int)pulsed);
+        if (gear && gear[0] != 0)
+            echttp_json_add_string (context, point, "gear", gear);
     }
     const char *error = echttp_json_export (context, buffer, 65537);
     if (error) {

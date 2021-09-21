@@ -26,6 +26,7 @@ function saveConfig () {
         else
             point.on = 0;
         point.connection = form.iolistform[prefix+'connect'].value;
+        point.gear = form.iolistform[prefix+'gear'].value;
         point.description = form.iolistform[prefix+'desc'].value;
         newconfig.relays.points[i] = point;
     }
@@ -41,7 +42,7 @@ function saveConfig () {
     command.send(JSON.stringify(newconfig));
 }
 
-function showRelay (name, gpio, on, connection, description) {
+function showRelay (name, gpio, on, connection, gear, description) {
 
     var outer = document.createElement("tr");
 
@@ -101,6 +102,18 @@ function showRelay (name, gpio, on, connection, description) {
     inner = document.createElement("td");
     entry = document.createElement("input");
     entry.type = 'text';
+    entry.name = prefix+'gear';
+    entry.placeholder = 'Name';
+    if (gear)
+        entry.value = gear;
+    else
+        entry.value = '';
+    inner.appendChild(entry);
+    outer.appendChild(inner);
+
+    inner = document.createElement("td");
+    entry = document.createElement("input");
+    entry.type = 'text';
     entry.name = prefix+'desc';
     entry.placeholder = 'Name';
     if (description)
@@ -115,7 +128,7 @@ function showRelay (name, gpio, on, connection, description) {
 }
 
 function addConfig () {
-    showRelay ('', '', '', '', '');
+    showRelay ('', '', '', '', '', '');
 }
 
 function relayShowConfig (response) {
@@ -124,7 +137,7 @@ function relayShowConfig (response) {
    for (var i = 0; i < points.length; i++) {
       var point = points[i];
       if (!point.description) point.description = '';
-      showRelay (point.name, point.gpio, point.on, point.connection, point.description);
+      showRelay (point.name, point.gpio, point.on, point.connection, point.gear, point.description);
    }
 }
 
@@ -182,6 +195,7 @@ window.onload = function() {
          <th>GPIO</th>
          <th>LEVEL</th>
          <th>CONNECTION</th>
+         <th>GEAR</th>
          <th>DESCRIPTION</th>
       </tr>
    </table>
