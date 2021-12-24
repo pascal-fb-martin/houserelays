@@ -1,5 +1,5 @@
 
-OBJS= houserelays.o houserelays_config.o houserelays_gpio.o
+OBJS= houserelays.o houserelays_gpio.o
 LIBOJS=
 
 SHARE=/usr/local/share/house

@@ -34,9 +34,9 @@
 #include "echttp_static.h"
 #include "houseportalclient.h"
 #include "houselog.h"
+#include "houseconfig.h"
 
 #include "houserelays.h"
-#include "houserelays_config.h"
 #include "houserelays_gpio.h"
 
 static int  UseHousePortal = 0;
@@ -157,10 +157,10 @@ static const char *relays_config (const char *method, const char *uri,
                                    const char *data, int length) {
 
     if (strcmp ("GET", method) == 0) {
-        echttp_transfer (houserelays_config_file(), houserelays_config_size());
+        echttp_transfer (houseconfig_open(), houseconfig_size());
         echttp_content_type_json ();
     } else if (strcmp ("POST", method) == 0) {
-        const char *error = houserelays_config_update (data);
+        const char *error = houseconfig_update (data);
         if (error) echttp_error (400, error);
         houserelays_gpio_refresh ();
     } else {
@@ -212,7 +212,8 @@ int main (int argc, const char **argv) {
     }
     houselog_initialize ("relays", argc, argv);
     houselog_event ("SERVICE", "relays", "START", "ON %s", HostName);
-    const char *error = houserelays_config_load (argc, argv);
+    houseconfig_default ("--config=relays");
+    const char *error = houseconfig_load (argc, argv);
     if (error) {
         houselog_trace
             (HOUSE_FAILURE, "CONFIG", "Cannot load configuration: %s\n", error);

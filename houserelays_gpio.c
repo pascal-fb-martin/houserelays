@@ -81,8 +81,9 @@
 #include <gpiod.h>
 
 #include "houselog.h"
+#include "houseconfig.h"
+
 #include "houserelays.h"
-#include "houserelays_config.h"
 #include "houserelays_gpio.h"
 
 struct RelayMap {
@@ -116,12 +117,12 @@ const char *houserelays_gpio_refresh (void) {
     }
     if (RelayChip) gpiod_chip_close (RelayChip);
 
-    int chip = houserelays_config_integer (0, ".relays.iochip");
+    int chip = houseconfig_integer (0, ".relays.iochip");
 
-    int relays = houserelays_config_array (0, ".relays.points");
+    int relays = houseconfig_array (0, ".relays.points");
     if (relays < 0) return "cannot find points array";
 
-    RelaysCount = houserelays_config_array_length (relays);
+    RelaysCount = houseconfig_array_length (relays);
     if (RelaysCount <= 0) return "no point found";
     if (echttp_isdebug()) fprintf (stderr, "found %d points\n", RelaysCount);
 
@@ -135,13 +136,13 @@ const char *houserelays_gpio_refresh (void) {
         int point;
         char path[128];
         snprintf (path, sizeof(path), "[%d]", i);
-        point = houserelays_config_object (relays, path);
+        point = houseconfig_object (relays, path);
         if (point > 0) {
-            Relays[i].name = houserelays_config_string (point, ".name");
-            Relays[i].gear = houserelays_config_string (point, ".gear");
-            Relays[i].desc = houserelays_config_string (point, ".description");
-            Relays[i].gpio = houserelays_config_integer (point, ".gpio");
-            Relays[i].on  = houserelays_config_integer (point, ".on") & 1;
+            Relays[i].name = houseconfig_string (point, ".name");
+            Relays[i].gear = houseconfig_string (point, ".gear");
+            Relays[i].desc = houseconfig_string (point, ".description");
+            Relays[i].gpio = houseconfig_integer (point, ".gpio");
+            Relays[i].on  = houseconfig_integer (point, ".on") & 1;
             if (echttp_isdebug()) fprintf (stderr, "found point %s, gpio %d, on %d %s\n", Relays[i].name, Relays[i].gpio, Relays[i].on, Relays[i].desc);
 
             Relays[i].off = 1 - Relays[i].on;
