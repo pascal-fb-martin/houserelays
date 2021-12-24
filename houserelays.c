@@ -211,7 +211,7 @@ int main (int argc, const char **argv) {
         UseHousePortal = 1;
     }
     houselog_initialize ("relays", argc, argv);
-    houselog_event ("SERVICE", "relays", "START", "ON %s", HostName);
+
     houseconfig_default ("--config=relays");
     const char *error = houseconfig_load (argc, argv);
     if (error) {
@@ -234,6 +234,7 @@ int main (int argc, const char **argv) {
 
     echttp_static_route ("/", "/usr/local/share/house/public");
     echttp_background (&hc_background);
+    houselog_event ("SERVICE", "relays", "STARTED", "ON %s", houselog_host());
     echttp_loop();
 }
 
