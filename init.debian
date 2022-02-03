@@ -6,7 +6,8 @@
 # Required-Stop:   $network $remote_fs $syslog $houseportal
 # Default-Start:   2 3 4 5
 # Default-Stop: 
-# Short-Description: Start the Relay Web Access daemon
+# Short-Description: Relays control
+# Description:       A web service that provides a web API to control relays attached to GPIO pins
 ### END INIT INFO
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin
