@@ -5,6 +5,8 @@ A web server to control relays
 
 This is a web server designed to provide access to a relay board. This project depends on [echttp](https://github.com/pascal-fb-martin/echttp) and [houseportal](https://github.com/pascal-fb-martin/houseportal).
 
+See the [gallery](https://github.com/pascal-fb-martin/houserelays/blob/master/gallery/README.md) for a view of HouseRelays's web UI.
+
 The primary intent is to support a distributed network of relay boards, to avoid pulling electric wires from one side of the home to the other: a small set of relay boards is installed, each board located close to existing wiring or near the equipment to control. Each relay board is attached to a small computer (e.g. Raspberry Pi Zero W). The typical use is to control sprinklers, a garage door, etc. By using such a micro-service architecture, the application may run anywhere in the home and still access all the devices, regardless of their locations.
 
 The secondary intent is to share a relay board between multiple independent applications: sprinkler system, garage door controller, etc. Each application control only those devices that it is configured for.
