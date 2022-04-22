@@ -14,7 +14,7 @@ The event page shows a record of the major changes detected by the HouseRelays s
 
 ![HouseRelays Event Page](https://raw.githubusercontent.com/pascal-fb-martin/houserelays/master/gallery/event-page.png)
 
-The configuration page is used to list the relays and identify their pin connection.
+The configuration page is used to list the relays and identify their pin connection. The GPIO column represent the Linux GPIO number, the CONNECTION column represents the ID of the connection pin on the relay board and is provided here for documentation. The GEAR column is used by other services to filter which controls they will displays on their UI: typically "light" for the HouseLights service. The name must be globally unique, i.e. it must be unique among all control service instances (including HouseKasa, HouseWiz, etc.).
 
 ![HouseRelays Config Page](https://raw.githubusercontent.com/pascal-fb-martin/houserelays/master/gallery/config-page.png)
 
