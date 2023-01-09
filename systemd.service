@@ -1,0 +1,12 @@
+[Unit]
+Description=the house relays control web service
+After=network-online.target houseportal.service
+
+[Service]
+EnvironmentFile=-/etc/default/houserelays
+EnvironmentFile=-/etc/sysconfig/houserelays
+ExecStart=/usr/local/bin/houserelays $OPTS
+
+[Install]
+WantedBy=multi-user.target
+
