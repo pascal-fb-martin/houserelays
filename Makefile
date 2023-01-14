@@ -47,6 +47,7 @@ install:
 uninstall:
 	systemctl stop houserelays
 	systemctl disable houserelays
+	rm -rf $(SHARE)/public/relays
 	rm -f /usr/local/bin/houserelays
 	rm -f /lib/systemd/system/houserelays.service /etc/init.d/houserelays
 	systemctl daemon-reload
