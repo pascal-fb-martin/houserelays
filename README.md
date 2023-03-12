@@ -77,7 +77,7 @@ The basic services included are:
 ```
 GET /relays/status
 ```
-Returns a status JSON object that lists each relay by name. Each relay is itself an object with state, command and gear elements and an optional pulse element. The state and commandelements are either on or 1 (active), or else off or 0 (inactive). The pulse element is present if there is a pulse timer active (see below for more information about pulses) and indicates the remaining number of seconds during which the current state will be maintained.
+Returns a status JSON object that lists each relay by name. Each relay is itself an object with state, command and gear elements and an optional pulse element. The state and command elements are either on or 1 (active), or else off or 0 (inactive). The pulse element is present if there is a pulse timer active (see below for more information about pulses) and indicates the remaining number of seconds during which the current state will be maintained.
 ```
 GET /relays/set?point=NAME&state=off|0|on|1
 GET /relays/set?point=NAME&state=off|0|on|1&pulse=N
