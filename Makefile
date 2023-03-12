@@ -14,10 +14,10 @@ clean:
 rebuild: clean all
 
 %.o: %.c
-	gcc -c -g -O -o $@ $<
+	gcc -c -Os -o $@ $<
 
 houserelays: $(OBJS)
-	gcc -g -O -o houserelays $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lgpiod -lrt
+	gcc -Os -o houserelays $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lgpiod -lrt
 
 install:
 	if [ -e /etc/init.d/houserelays ] ; then systemctl stop houserelays ; systemctl disable houserelays ; rm -f /etc/init.d/houserelays ; fi
