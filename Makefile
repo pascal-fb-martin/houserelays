@@ -4,6 +4,8 @@ LIBOJS=
 
 SHARE=/usr/local/share/house
 
+# Local build ---------------------------------------------------
+
 all: houserelays
 
 main: houserelays.o
@@ -19,9 +21,9 @@ rebuild: clean all
 houserelays: $(OBJS)
 	gcc -Os -o houserelays $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lgpiod -lrt
 
-install:
-	if [ -e /etc/init.d/houserelays ] ; then systemctl stop houserelays ; systemctl disable houserelays ; rm -f /etc/init.d/houserelays ; fi
-	if [ -e /lib/systemd/system/houserelays.service ] ; then systemctl stop houserelays ; systemctl disable houserelays ; rm -f /lib/systemd/system/houserelays.service ; fi
+# Distribution agnostic file installation -----------------------
+
+install-files:
 	mkdir -p /usr/local/bin
 	mkdir -p /var/lib/house
 	mkdir -p /etc/house
@@ -29,8 +31,6 @@ install:
 	cp houserelays /usr/local/bin
 	chown root:root /usr/local/bin/houserelays
 	chmod 755 /usr/local/bin/houserelays
-	cp systemd.service /lib/systemd/system/houserelays.service
-	chown root:root /lib/systemd/system/houserelays.service
 	mkdir -p $(SHARE)/public/relays
 	chmod 755 $(SHARE) $(SHARE)/public $(SHARE)/public/relays
 	cp public/* $(SHARE)/public/relays
@@ -40,18 +40,45 @@ install:
 	chown root:root /etc/house/relays.json
 	chmod 644 /etc/house/relays.json
 	touch /etc/default/houserelays
-	systemctl daemon-reload
-	systemctl enable houserelays
-	systemctl start houserelays
 
-uninstall:
-	systemctl stop houserelays
-	systemctl disable houserelays
+uninstall-files:
 	rm -rf $(SHARE)/public/relays
 	rm -f /usr/local/bin/houserelays
-	rm -f /lib/systemd/system/houserelays.service /etc/init.d/houserelays
-	systemctl daemon-reload
 
-purge: uninstall
+purge-config:
 	rm -rf /etc/house/relays.config /etc/default/houserelays
+
+# Distribution agnostic systemd support -------------------------
+
+install-systemd:
+
+uninstall-systemd:
+	if [ -e /etc/init.d/houserelays ] ; then systemctl stop houserelays ; systemctl disable houserelays ; rm -f /etc/init.d/houserelays ; fi
+	if [ -e /lib/systemd/system/houserelays.service ] ; then systemctl stop houserelays ; systemctl disable houserelays ; rm -f /lib/systemd/system/houserelays.service ; systemctl daemon-reload ; fi
+
+stop-systemd: uninstall-systemd
+
+# Debian GNU/Linux install --------------------------------------
+
+install-debian: stop-systemd install-files install-systemd
+
+uninstall-debian: uninstall-systemd uninstall-files
+
+purge-debian: uninstall-debian purge-config
+
+# Void Linux install --------------------------------------------
+
+install-void: install-files
+
+uninstall-void: uninstall-files
+
+purge-void: uninstall-void purge-config
+
+# Default install (Debian GNU/Linux) ----------------------------
+
+install: install-debian
+
+uninstall: uninstall-debian
+
+purge: purge-debian
 
