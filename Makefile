@@ -1,10 +1,30 @@
+# houserelays - A simple home web server for world domination through relays
+#
+# Copyright 2023, Pascal Martin
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor,
+# Boston, MA  02110-1301, USA.
+
+HAPP=houserelays
+HROOT=/usr/local
+SHARE=$(HROOT)/share/house
+
+# Application build. --------------------------------------------
 
 OBJS= houserelays.o houserelays_gpio.o
 LIBOJS=
-
-SHARE=/usr/local/share/house
-
-# Local build ---------------------------------------------------
 
 all: houserelays
 
@@ -23,14 +43,14 @@ houserelays: $(OBJS)
 
 # Distribution agnostic file installation -----------------------
 
-install-files:
-	mkdir -p /usr/local/bin
+install-app:
+	mkdir -p $(HROOT)/bin
 	mkdir -p /var/lib/house
 	mkdir -p /etc/house
-	rm -f /usr/local/bin/houserelays
-	cp houserelays /usr/local/bin
-	chown root:root /usr/local/bin/houserelays
-	chmod 755 /usr/local/bin/houserelays
+	rm -f $(HROOT)/bin/houserelays
+	cp houserelays $(HROOT)/bin
+	chown root:root $(HROOT)/bin/houserelays
+	chmod 755 $(HROOT)/bin/houserelays
 	mkdir -p $(SHARE)/public/relays
 	chmod 755 $(SHARE) $(SHARE)/public $(SHARE)/public/relays
 	cp public/* $(SHARE)/public/relays
@@ -41,44 +61,16 @@ install-files:
 	chmod 644 /etc/house/relays.json
 	touch /etc/default/houserelays
 
-uninstall-files:
+uninstall-app:
 	rm -rf $(SHARE)/public/relays
-	rm -f /usr/local/bin/houserelays
+	rm -f $(HROOT)/bin/houserelays
+
+purge-app:
 
 purge-config:
 	rm -rf /etc/house/relays.config /etc/default/houserelays
 
-# Distribution agnostic systemd support -------------------------
+# System installation. ------------------------------------------
 
-install-systemd:
-
-uninstall-systemd:
-	if [ -e /etc/init.d/houserelays ] ; then systemctl stop houserelays ; systemctl disable houserelays ; rm -f /etc/init.d/houserelays ; fi
-	if [ -e /lib/systemd/system/houserelays.service ] ; then systemctl stop houserelays ; systemctl disable houserelays ; rm -f /lib/systemd/system/houserelays.service ; systemctl daemon-reload ; fi
-
-stop-systemd: uninstall-systemd
-
-# Debian GNU/Linux install --------------------------------------
-
-install-debian: stop-systemd install-files install-systemd
-
-uninstall-debian: uninstall-systemd uninstall-files
-
-purge-debian: uninstall-debian purge-config
-
-# Void Linux install --------------------------------------------
-
-install-void: install-files
-
-uninstall-void: uninstall-files
-
-purge-void: uninstall-void purge-config
-
-# Default install (Debian GNU/Linux) ----------------------------
-
-install: install-debian
-
-uninstall: uninstall-debian
-
-purge: purge-debian
+include $(SHARE)/install.mak
 
