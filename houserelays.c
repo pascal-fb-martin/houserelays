@@ -42,24 +42,6 @@
 static int  UseHousePortal = 0;
 static char HostName[256];
 
-static void hc_help (const char *argv0) {
-
-    int i = 1;
-    const char *help;
-
-    printf ("%s [-h] [-debug] [-test]%s\n", argv0, echttp_help(0));
-
-    printf ("\nGeneral options:\n");
-    printf ("   -h:              print this help.\n");
-
-    printf ("\nHTTP options:\n");
-    help = echttp_help(i=1);
-    while (help) {
-        printf ("   %s\n", help);
-        help = echttp_help(++i);
-    }
-    exit (0);
-}
 
 static const char *relays_status (const char *method, const char *uri,
                                    const char *data, int length) {
@@ -169,7 +151,7 @@ static const char *relays_config (const char *method, const char *uri,
     return "";
 }
 
-static void hc_background (int fd, int mode) {
+static void relays_background (int fd, int mode) {
 
     static time_t LastRenewal = 0;
     time_t now = time(0);
@@ -233,7 +215,7 @@ int main (int argc, const char **argv) {
     echttp_route_uri ("/relays/config", relays_config);
 
     echttp_static_route ("/", "/usr/local/share/house/public");
-    echttp_background (&hc_background);
+    echttp_background (&relays_background);
     houselog_event ("SERVICE", "relays", "STARTED", "ON %s", houselog_host());
     echttp_loop();
 }

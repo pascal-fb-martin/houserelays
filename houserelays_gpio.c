@@ -98,7 +98,7 @@ struct RelayMap {
     time_t deadline;
 };
 
-static struct RelayMap *Relays;
+static struct RelayMap *Relays = 0;
 static int RelaysCount = 0;
 
 static struct gpiod_chip *RelayChip = 0;
@@ -126,6 +126,7 @@ const char *houserelays_gpio_refresh (void) {
     if (RelaysCount <= 0) return "no point found";
     if (echttp_isdebug()) fprintf (stderr, "found %d points\n", RelaysCount);
 
+    if (Relays) free(Relays);
     Relays = calloc(sizeof(struct RelayMap), RelaysCount);
     if (!Relays) return "no more memory";
 

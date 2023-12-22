@@ -47,6 +47,7 @@ install-app:
 	mkdir -p $(HROOT)/bin
 	mkdir -p /var/lib/house
 	mkdir -p /etc/house
+	chmod 755 $(HROOT)/bin /var/lib/house /etc/house
 	rm -f $(HROOT)/bin/houserelays
 	cp houserelays $(HROOT)/bin
 	chown root:root $(HROOT)/bin/houserelays
