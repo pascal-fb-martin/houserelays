@@ -79,12 +79,14 @@ GET /relays/status
 ```
 Returns a status JSON object that lists each relay by name. Each relay is itself an object with state, command and gear elements and an optional pulse element. The state and command elements are either on or 1 (active), or else off or 0 (inactive). The pulse element is present if there is a pulse timer active (see below for more information about pulses) and indicates the remaining number of seconds during which the current state will be maintained.
 ```
-GET /relays/set?point=NAME&state=off|0|on|1
-GET /relays/set?point=NAME&state=off|0|on|1&pulse=N
+GET /relays/set?point=NAME&state=off|0|on|1[&cause=TEXT]
+GET /relays/set?point=NAME&state=off|0|on|1&pulse=N[&cause=TEXT]
 ```
 Set the specified relay point to the specified state. If the pulse parameter is present the point is maintained for the specified number of seconds, then reverted (i.e. if state is 1 and pulse if 10, the relay is set active for 10 seconds then changed to inactive after 10 seconds). If the pulse parameter is not present or its value is 0, the specified state is maintained until the next set request is issued.
 
 The point name "all" denotes all points served by this web server. Use with caution as the service maybe shared between multiple applications. It is intended for maintenance only.
+
+The optional cause parameter is reflected in the event that records the control. This is a way to describe what caused the control to be issued, thus the name.
 ```
 GET /relays/recent
 ```
