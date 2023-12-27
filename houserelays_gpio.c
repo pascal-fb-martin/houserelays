@@ -63,11 +63,12 @@
  *
  *    Get the actual state of the point.
  *
- * int houserelays_gpio_set (int point, int state, int pulse);
+ * int houserelays_gpio_set (int point, int state, int pulse, const char *cause);
  *
  *    Set the specified point to the on (1) or off (0) state for the pulse
  *    length specified. The pulse length is in seconds. If pulse is 0,
- *    the relay is maintained until a new state is applied.
+ *    the relay is maintained until a new state is applied. The cause
+ *    parameter, if not null, is used to populate the event.
  *
  *    Return 1 on success, 0 if the point is not known and -1 on error.
  *
@@ -203,10 +204,11 @@ int houserelays_gpio_get (int point) {
     return (state == Relays[point].on);
 }
 
-int houserelays_gpio_set (int point, int state, int pulse) {
+int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
 
     time_t now = time(0);
     const char *namedstate = state?"on":"off";
+    char comment[256];
 
     if (echttp_isdebug()) {
         if (pulse)
@@ -217,17 +219,22 @@ int houserelays_gpio_set (int point, int state, int pulse) {
     if (point < 0 || point > RelaysCount) return 0;
     gpiod_line_set_value(Relays[point].line,
                          state?Relays[point].on:Relays[point].off);
+    if (cause)
+        snprintf (comment, sizeof(comment), " (%s)", cause);
+    else
+        comment[0] = 0;
     if (pulse > 0) {
         Relays[point].deadline = time(0) + pulse;
         houselog_event ("GPIO", Relays[point].name, namedstate,
-                        "FOR %d SECONDS", pulse);
+                        "FOR %d SECONDS%s", pulse, comment);
     } else if (pulse < 0) {
         Relays[point].deadline = 0;
         houselog_event ("GPIO", Relays[point].name, namedstate,
                         "END OF PULSE");
     } else {
         Relays[point].deadline = 0;
-        houselog_event ("GPIO", Relays[point].name, namedstate, "LATCHED");
+        houselog_event ("GPIO", Relays[point].name, namedstate,
+                        "LATCHED%s", comment);
     }
     Relays[point].commanded = state;
     return 1;
@@ -238,7 +245,7 @@ void houserelays_gpio_periodic (time_t now) {
     int i;
     for (i = 0; i < RelaysCount; ++i) {
         if (Relays[i].deadline > 0 && now >= Relays[i].deadline) {
-            houserelays_gpio_set (i, 1 - Relays[i].commanded, -1);
+            houserelays_gpio_set (i, 1 - Relays[i].commanded, -1, 0);
         }
     }
 }
