@@ -94,7 +94,11 @@ struct RelayMap {
     int gpio;
     int on;
     int off;
+#ifdef USE_GPIOD2
+    struct gpiod_line_request *line;
+#else
     struct gpiod_line *line;
+#endif
     int commanded;
     time_t deadline;
 };
@@ -113,12 +117,19 @@ const char *houserelays_gpio_refresh (void) {
 
     int i;
     for (i = 0; i < RelaysCount; ++i) {
+        if (!Relays[i].line) continue;
+#ifdef USE_GPIOD2
+        gpiod_line_request_release (Relays[i].line);
+#else
         gpiod_line_release (Relays[i].line);
+#endif
         Relays[i].name = 0;
     }
     if (RelayChip) gpiod_chip_close (RelayChip);
 
     int chip = houseconfig_integer (0, ".relays.iochip");
+    char path[127];
+    snprintf (path, sizeof(path), "/dev/gpiochip%d", chip);
 
     int relays = houseconfig_array (0, ".relays.points");
     if (relays < 0) return "cannot find points array";
@@ -131,7 +142,7 @@ const char *houserelays_gpio_refresh (void) {
     Relays = calloc(sizeof(struct RelayMap), RelaysCount);
     if (!Relays) return "no more memory";
 
-    RelayChip = gpiod_chip_open_by_number(chip);
+    RelayChip = gpiod_chip_open(path);
     if (!RelayChip) return "cannot access GPIO";
 
     for (i = 0; i < RelaysCount; ++i) {
@@ -148,10 +159,39 @@ const char *houserelays_gpio_refresh (void) {
             if (echttp_isdebug()) fprintf (stderr, "found point %s, gpio %d, on %d %s\n", Relays[i].name, Relays[i].gpio, Relays[i].on, Relays[i].desc);
 
             Relays[i].off = 1 - Relays[i].on;
-            Relays[i].line = gpiod_chip_get_line (RelayChip, Relays[i].gpio);
+            Relays[i].line = 0;
             Relays[i].commanded = 0;
             Relays[i].deadline = 0;
 
+#ifdef USE_GPIOD2
+            struct gpiod_line_settings *settings = gpiod_line_settings_new();
+            struct gpiod_line_config *lineconfig = gpiod_line_config_new();
+            struct gpiod_request_config *requestconfig = gpiod_request_config_new();
+            if ((!settings) || (!lineconfig) || (!requestconfig))
+                goto endv2init;
+
+            gpiod_line_settings_set_direction (settings, GPIOD_LINE_DIRECTION_OUTPUT);
+            gpiod_line_settings_set_output_value (settings, Relays[i].off);
+            gpiod_line_settings_set_drive (settings,
+                    Relays[i].on?GPIOD_LINE_DRIVE_PUSH_PULL:GPIOD_LINE_DRIVE_OPEN_DRAIN);
+
+            const unsigned iopin = Relays[i].gpio;
+            gpiod_line_config_add_line_settings (lineconfig, &iopin, 1, settings);
+
+            gpiod_request_config_set_consumer (requestconfig, "HouseRelays");
+
+            Relays[i].line = gpiod_chip_request_lines(RelayChip, requestconfig, lineconfig);
+            if (!Relays[i].line) goto endv2init;
+
+            gpiod_line_request_set_value(Relays[i].line, Relays[i].gpio, Relays[i].off);
+
+endv2init:
+            if (requestconfig) gpiod_request_config_free(requestconfig);
+            if (lineconfig) gpiod_line_config_free(lineconfig);
+            if (settings) gpiod_line_settings_free(settings);
+#else
+            Relays[i].line = gpiod_chip_get_line (RelayChip, Relays[i].gpio);
+            if (!Relays[i].line) continue;
             if (Relays[i].on) {
                 gpiod_line_request_output
                     (Relays[i].line, Relays[i].name, GPIOD_LINE_ACTIVE_STATE_HIGH);
@@ -160,6 +200,7 @@ const char *houserelays_gpio_refresh (void) {
                     (Relays[i].line, Relays[i].name, GPIOD_LINE_REQUEST_FLAG_OPEN_DRAIN, GPIOD_LINE_ACTIVE_STATE_HIGH);
             }
             gpiod_line_set_value(Relays[i].line, Relays[i].off);
+#endif
         }
     }
     return 0;
@@ -200,7 +241,12 @@ time_t houserelays_gpio_deadline (int point) {
 
 int houserelays_gpio_get (int point) {
     if (point < 0 || point > RelaysCount) return 0;
+    if (!Relays[point].line) return 0;
+#ifdef USE_GPIOD2
+    int state = gpiod_line_request_get_value (Relays[point].line, Relays[point].gpio);
+#else
     int state = gpiod_line_get_value (Relays[point].line);
+#endif
     return (state == Relays[point].on);
 }
 
@@ -217,8 +263,14 @@ int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
             fprintf (stderr, "set %s to %s at %ld\n", Relays[point].name, namedstate, now);
     }
     if (point < 0 || point > RelaysCount) return 0;
+    if (!Relays[point].line) return 0;
+#ifdef USE_GPIOD2
+    gpiod_line_request_set_value(Relays[point].line, Relays[point].gpio,
+                                 state?Relays[point].on:Relays[point].off);
+#else
     gpiod_line_set_value(Relays[point].line,
                          state?Relays[point].on:Relays[point].off);
+#endif
     if (cause)
         snprintf (comment, sizeof(comment), " (%s)", cause);
     else

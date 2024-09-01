@@ -23,6 +23,8 @@ SHARE=$(HROOT)/share/house
 
 # Application build. --------------------------------------------
 
+GPIODOPT=$(shell pkg-config --atleast-version=2 libgpiod 2> /dev/null && echo -DUSE_GPIOD2)
+
 OBJS= houserelays.o houserelays_gpio.o
 LIBOJS=
 
@@ -36,7 +38,7 @@ clean:
 rebuild: clean all
 
 %.o: %.c
-	gcc -c -Os -o $@ $<
+	gcc $(GPIODOPT) -c -Os -o $@ $<
 
 houserelays: $(OBJS)
 	gcc -Os -o houserelays $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lgpiod -lrt
