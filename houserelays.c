@@ -33,8 +33,10 @@
 #include "echttp_json.h"
 #include "echttp_static.h"
 #include "houseportalclient.h"
+#include "housediscover.h"
 #include "houselog.h"
 #include "houseconfig.h"
+#include "housedepositor.h"
 
 #include "houserelays.h"
 #include "houserelays_gpio.h"
@@ -140,12 +142,17 @@ static const char *relays_config (const char *method, const char *uri,
                                    const char *data, int length) {
 
     if (strcmp ("GET", method) == 0) {
-        echttp_transfer (houseconfig_open(), houseconfig_size());
         echttp_content_type_json ();
+        return houseconfig_current();
     } else if (strcmp ("POST", method) == 0) {
         const char *error = houseconfig_update (data);
-        if (error) echttp_error (400, error);
-        houserelays_gpio_refresh ();
+        if (error) {
+            echttp_error (400, error);
+        } else {
+            houserelays_gpio_refresh ();
+            houselog_event ("SYSTEM", "CONFIG", "SAVE", "TO DEPOT %s", houseconfig_name());
+            housedepositor_put ("config", houseconfig_name(), data, length);
+        }
     } else {
         echttp_error (400, "invalid state value");
     }
@@ -168,7 +175,18 @@ static void relays_background (int fd, int mode) {
         }
     }
     houserelays_gpio_periodic(now);
+    housediscover (now);
     houselog_background (now);
+    housedepositor_periodic (now);
+}
+
+static void relays_config_listener (const char *name, time_t timestamp,
+                                    const char *data, int length) {
+
+    houselog_event ("SYSTEM", "CONFIG", "LOAD", "FROM DEPOT %s", name);
+    const char *error = houseconfig_update (data);
+    if (error) echttp_error (400, error);
+    else houserelays_gpio_refresh ();
 }
 
 static void relays_protect (const char *method, const char *uri) {
@@ -176,6 +194,8 @@ static void relays_protect (const char *method, const char *uri) {
 }
 
 int main (int argc, const char **argv) {
+
+    char defaultoption[256];
 
     // These strange statements are to make sure that fds 0 to 2 are
     // reserved, since this application might output some errors.
@@ -193,7 +213,11 @@ int main (int argc, const char **argv) {
         houseportal_initialize (argc, argv);
         UseHousePortal = 1;
     }
+    housediscover_initialize (argc, argv);
     houselog_initialize ("relays", argc, argv);
+    snprintf (defaultoption, sizeof(defaultoption), "-group=%s", HostName);
+    housedepositor_default (defaultoption);
+    housedepositor_initialize (argc, argv);
 
     houseconfig_default ("--config=relays");
     const char *error = houseconfig_load (argc, argv);
@@ -206,6 +230,7 @@ int main (int argc, const char **argv) {
         houselog_trace
             (HOUSE_FAILURE, "CONFIG", "Cannot configure GPIO: %s\n", error);
     }
+    housedepositor_subscribe ("config", houseconfig_name(), relays_config_listener);
 
     echttp_cors_allow_method("GET");
     echttp_protect (0, relays_protect);
