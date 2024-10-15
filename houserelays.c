@@ -184,9 +184,7 @@ static void relays_config_listener (const char *name, time_t timestamp,
                                     const char *data, int length) {
 
     houselog_event ("SYSTEM", "CONFIG", "LOAD", "FROM DEPOT %s", name);
-    const char *error = houseconfig_update (data);
-    if (error) echttp_error (400, error);
-    else houserelays_gpio_refresh ();
+    if (!houseconfig_update (data)) houserelays_gpio_refresh ();
 }
 
 static void relays_protect (const char *method, const char *uri) {
