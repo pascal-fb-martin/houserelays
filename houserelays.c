@@ -41,7 +41,6 @@
 #include "houserelays.h"
 #include "houserelays_gpio.h"
 
-static int  UseHousePortal = 0;
 static char HostName[256];
 
 
@@ -161,19 +160,9 @@ static const char *relays_config (const char *method, const char *uri,
 
 static void relays_background (int fd, int mode) {
 
-    static time_t LastRenewal = 0;
     time_t now = time(0);
 
-    if (UseHousePortal) {
-        static const char *path[] = {"control:/relays"};
-        if (now >= LastRenewal + 60) {
-            if (LastRenewal > 0)
-                houseportal_renew();
-            else
-                houseportal_register (echttp_port(4), path, 1);
-            LastRenewal = now;
-        }
-    }
+    houseportal_background (now);
     houserelays_gpio_periodic(now);
     housediscover (now);
     houselog_background (now);
@@ -208,8 +197,9 @@ int main (int argc, const char **argv) {
 
     argc = echttp_open (argc, argv);
     if (echttp_dynamic_port()) {
+        static const char *path[] = {"control:/relays"};
         houseportal_initialize (argc, argv);
-        UseHousePortal = 1;
+        houseportal_declare (echttp_port(4), path, 1);
     }
     housediscover_initialize (argc, argv);
     houselog_initialize ("relays", argc, argv);
