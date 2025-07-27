@@ -68,6 +68,7 @@ The API supported by this server is designed to be as generic as possible. The g
 It is recommended to use for each relay a name that represents the device connected to the relay and is unique across the network. Not only does this make the client independent of which relay is used, but will also allow the clients to discover which servers offer access to the devices they are controlling. (The default configuration provided does not follow this convention because it assumes that no application has been configured yet.)
 
 The basic services included are:
+
 * Send controls (with optional pulse timer).
 * Get the current status of all devices, which also serves as a way to discover the list of devices present on this server.
 * Get a recent history of the controls received.
