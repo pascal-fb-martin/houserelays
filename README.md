@@ -103,3 +103,19 @@ Upload and activate a new server configuration.
 
 The server is also capable of serving static pages, location in /usr/share/house/public/relays. The URL of each page must start with /relays.
 
+## Debian Packaging
+
+The provided Makefile supports building private Debian packages. These are _not_ official packages:
+
+- They do not follow all Debian policies.
+
+- They are not built using Debian standard conventions and tools.
+
+- The packaging is not separate from the upstream sources, and there is
+  no source package.
+
+To build a Debian package, use the `debian-package` target:
+```
+make debian-package
+```
+
