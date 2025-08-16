@@ -27,6 +27,7 @@ SHARE=$(prefix)/share/house
 INSTALL=/usr/bin/install
 
 HAPP=houserelays
+HCAT=automation
 
 # Application build. --------------------------------------------
 

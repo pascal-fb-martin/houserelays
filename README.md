@@ -1,4 +1,5 @@
 # houserelays
+
 A web server to control relays
 
 ## Overview
@@ -30,6 +31,7 @@ This program implements the House control web service and API.
 The typical hardware supported by this applications are relay boards controlled through 5V TTL digital pins. These are wired to the digital I/O pins of a Raspberry Pi, Odroid or other small Linux computers. Depending on the model, these board are either controlled using open-drain outputs (active low) or 3-state outputs (active high).
 
 The hardware interface is configured through the file /etc/house/relays.json. A typical exemple of configuration is:
+
 ```
 {
     "relays" : {
@@ -51,6 +53,7 @@ The hardware interface is configured through the file /etc/house/relays.json. A 
     }
 }
 ```
+
 The iochip item must match the Linux gpiod chip index. The gpio item must match the gpiod line offset (this also matches the usual Raspberry Pi naming convention for I/O pin names, e.g. GPIO4, GPIO17).
 
 If on is 0, the output is configured as open-drain, the on command sets the output to 0, and the off command sets the output to 1.
@@ -78,27 +81,36 @@ The basic services included are:
 ```
 GET /relays/status
 ```
+
 Returns a status JSON object that lists each relay by name. Each relay is itself an object with state, command and gear elements and an optional pulse element. The state and command elements are either on or 1 (active), or else off or 0 (inactive). The pulse element is present if there is a pulse timer active (see below for more information about pulses) and indicates the remaining number of seconds during which the current state will be maintained.
+
 ```
 GET /relays/set?point=NAME&state=off|0|on|1[&cause=TEXT]
 GET /relays/set?point=NAME&state=off|0|on|1&pulse=N[&cause=TEXT]
 ```
+
 Set the specified relay point to the specified state. If the pulse parameter is present the point is maintained for the specified number of seconds, then reverted (i.e. if state is 1 and pulse if 10, the relay is set active for 10 seconds then changed to inactive after 10 seconds). If the pulse parameter is not present or its value is 0, the specified state is maintained until the next set request is issued.
 
 The point name "all" denotes all points served by this web server. Use with caution as the service maybe shared between multiple applications. It is intended for maintenance only.
 
 The optional cause parameter is reflected in the event that records the control. This is a way to describe what caused the control to be issued, thus the name.
+
 ```
 GET /relays/recent
 ```
+
 Return a JSON array of all the recent relay state changes. The history is not saved to disk and the server keeps only a fixed number of state changes.
+
 ```
 GET /relays/config
 ```
+
 Return a JSON dump of the server's local configuration.
+
 ```
 POST /relays/config
 ```
+
 Upload and activate a new server configuration.
 
 The server is also capable of serving static pages, location in /usr/share/house/public/relays. The URL of each page must start with /relays.
@@ -115,6 +127,7 @@ The provided Makefile supports building private Debian packages. These are _not_
   no source package.
 
 To build a Debian package, use the `debian-package` target:
+
 ```
 make debian-package
 ```
