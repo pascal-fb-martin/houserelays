@@ -5,9 +5,9 @@ Maintainer: Pascal Martin <pascal.fb.martin@gmail.com>
 Priority: optional
 Homepage: https://github.com/pascal-fb-martin/houserelays
 Standard-Version: 4.7.0
-Package: houserelays,libgpiod2
+Package: houserelays
 Architecture: {{arch}}
-Depends: houseportal
+Depends: houseportal,libgpiod2
 Description: A House service to control relays through GPIO
  HouseRelays is part of the House suite of web services.
  .
