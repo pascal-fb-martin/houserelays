@@ -1,4 +1,4 @@
-# houserelays
+# HouseRelays
 
 A web server to control relays
 
