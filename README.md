@@ -40,12 +40,14 @@ The hardware interface is configured through the file /etc/house/relays.json. A 
             {
                 "name" : "relay1",
                 "gpio" : 4,
+                "mode" : "output",
                 "on" : 0,
                 "gear" : "valve"
             },
             {
                 "name" : "relay2",
                 "gpio" : 17,
+                "mode" : "output",
                 "on" : 0,
                 "gear" : "valve"
             }
@@ -55,6 +57,8 @@ The hardware interface is configured through the file /etc/house/relays.json. A 
 ```
 
 The iochip item must match the Linux gpiod chip index. The gpio item must match the gpiod line offset (this also matches the usual Raspberry Pi naming convention for I/O pin names, e.g. GPIO4, GPIO17).
+
+The mode can be `input` or `output`. If the item is missing, the mode defaults to `output`. All control requests that target an input point are ignored.
 
 If on is 0, the output is configured as open-drain, the on command sets the output to 0, and the off command sets the output to 1.
 

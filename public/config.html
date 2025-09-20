@@ -42,7 +42,7 @@ function saveConfig () {
     command.send(JSON.stringify(newconfig));
 }
 
-function showRelay (name, gpio, on, connection, gear, description) {
+function showRelay (name, gpio, mode, on, connection, gear, description) {
 
     var outer = document.createElement("tr");
 
@@ -66,6 +66,23 @@ function showRelay (name, gpio, on, connection, gear, description) {
     entry.value = gpio;
     entry.placeholder = 'GPIO';
     entry.inputmode = 'numeric';
+    inner.appendChild(entry);
+    outer.appendChild(inner);
+
+    inner = document.createElement("td");
+    entry = document.createElement ('select');
+    entry.name = prefix+'mode';
+    var opt = document.createElement ('option');
+    opt.value = 'output';
+    opt.innerHTML = 'Output';
+    if (!mode) opt.selected = true;
+    else if (mode === 'output') opt.selected = true;
+    entry.appendChild(opt);
+    opt = document.createElement ('option');
+    opt.value = 'input';
+    opt.innerHTML = 'Input';
+    if (mode === 'input') opt.selected = true;
+    entry.appendChild(opt);
     inner.appendChild(entry);
     outer.appendChild(inner);
 
@@ -128,7 +145,7 @@ function showRelay (name, gpio, on, connection, gear, description) {
 }
 
 function addConfig () {
-    showRelay ('', '', '', '', '', '');
+    showRelay ('', '', 'output', '', '', '', '');
 }
 
 function relayShowConfig (response) {
@@ -137,7 +154,7 @@ function relayShowConfig (response) {
    for (var i = 0; i < points.length; i++) {
       var point = points[i];
       if (!point.description) point.description = '';
-      showRelay (point.name, point.gpio, point.on, point.connection, point.gear, point.description);
+      showRelay (point.name, point.gpio, point.mode, point.on, point.connection, point.gear, point.description);
    }
 }
 
@@ -193,6 +210,7 @@ window.onload = function() {
       <tr>
          <th>NAME</th>
          <th>GPIO</th>
+         <th>MODE</th>
          <th>LEVEL</th>
          <th>CONNECTION</th>
          <th>GEAR</th>

@@ -64,12 +64,14 @@ static const char *relays_status (const char *method, const char *uri,
     for (i = 0; i < count; ++i) {
         time_t pulsed = houserelays_gpio_deadline(i);
         const char *name = houserelays_gpio_name(i);
+        const char *mode = houserelays_gpio_mode(i);
         const char *status = houserelays_gpio_failure(i);
         if (!status) status = houserelays_gpio_get(i)?"on":"off";
         const char *commanded = houserelays_gpio_commanded(i)?"on":"off";
         const char *gear = houserelays_gpio_gear(i);
 
         int point = echttp_json_add_object (context, container, name);
+        if (mode) echttp_json_add_string (context, point, "mode", mode);
         echttp_json_add_string (context, point, "state", status);
         echttp_json_add_string (context, point, "command", commanded);
         if (pulsed)
