@@ -100,10 +100,24 @@ The point name "all" denotes all points served by this web server. Use with caut
 The optional cause parameter is reflected in the event that records the control. This is a way to describe what caused the control to be issued, thus the name.
 
 ```
-GET /relays/recent
+GET /relays/changes[?since=MILLISECONDS]
 ```
 
-Return a JSON array of all the recent relay state changes. The history is not saved to disk and the server keeps only a fixed number of state changes.
+Return a JSON array of the recent input state changes. The history is not saved to disk and the server keeps only a fixed number of state changes. The client must request new changes at most every 5 seconds.
+
+This endpoint returns no data if there is no input point configured. Output points are never included here.
+
+This returns data in the JSON format with the following structure:
+
+- host:      Name of the host machine this service runs on.
+- timestamp: Time of the response.
+- sequence:  An object that describes the input points that changed.
+- sequence.start: Time of the oldest state.
+- sequence.step:  Interval between two consecutive values.
+- sequend.end:    Time of the most recent state (relative to sequence.start).
+- sequence.data:  An object that lists every input that changed. Each input is an array of sequential values.
+
+All time values in the sequence object are in millisecond units.
 
 ```
 GET /relays/config

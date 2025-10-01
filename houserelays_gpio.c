@@ -77,6 +77,13 @@
  *
  *    Return 1 on success, 0 if the point is not known and -1 on error.
  *
+ * int houserelays_gpio_changes (long long since, char *buffer, int size);
+ *
+ *    Populate the buffer with an history of the input changes that occurred
+ *    after the provided millisecond timestamp. The history takes the form of
+ *    a JSON structure. Point that have not changed are ommited.
+ *    If since is 0, return the complete recent history.
+ *
  * void houserelays_gpio_periodic (void);
  *
  *    This function must be called every second. It ends the expired pulses.
@@ -84,6 +91,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <sys/time.h>
 #include <gpiod.h>
 
 #include "houselog.h"
@@ -94,6 +102,12 @@
 
 #define HOUSE_GPIO_MODE_INPUT  1
 #define HOUSE_GPIO_MODE_OUTPUT 2
+
+// Keep about 6 seconds worth of history, to allow processing periodic requests
+// up to 5 seconds aparts with some margin.
+//
+#define HOUSE_GPIO_SEQUENCE_PERIOD 100  // Milliseconds.
+#define HOUSE_GPIO_SEQUENCE_DEPTH   64
 
 struct RelayMap {
     const char *name;
@@ -110,10 +124,18 @@ struct RelayMap {
 #endif
     int commanded;
     time_t deadline;
+
+    char sequence[HOUSE_GPIO_SEQUENCE_DEPTH];
 };
 
 static struct RelayMap *Relays = 0;
 static int RelaysCount = 0;
+
+static int *InputIndex = 0;
+static int InputCount = 0;
+
+static long long RelayTimestamps[HOUSE_GPIO_SEQUENCE_DEPTH];
+static int RelayLastScan = 0;
 
 static struct gpiod_chip *RelayChip = 0;
 
@@ -136,6 +158,27 @@ static int houserelays_gpio_to_mode (const char *text) {
    return HOUSE_GPIO_MODE_INPUT; // Safer, no short circuit.
 }
 
+static int houserelays_gpio_to_sequence (long long timestamp) {
+    return (int) ((timestamp / HOUSE_GPIO_SEQUENCE_PERIOD) % HOUSE_GPIO_SEQUENCE_DEPTH);
+}
+
+static void houserelays_gpio_scanner (int fd, int mode) {
+
+    struct timeval now;
+    gettimeofday (&now, 0);
+
+    long long timestamp = (1000LL * now.tv_sec) + now.tv_usec / 1000;
+    int index = houserelays_gpio_to_sequence (timestamp);
+
+    int i;
+    for (i = 0; i < InputCount; ++i) {
+        int point = InputIndex[i];
+        Relays[point].sequence[index] = (char) houserelays_gpio_get (point);
+    }
+    RelayTimestamps[index] = timestamp;
+    RelayLastScan = index;
+}
+
 const char *houserelays_gpio_refresh (void) {
 
     int i;
@@ -149,6 +192,10 @@ const char *houserelays_gpio_refresh (void) {
         Relays[i].name = 0;
     }
     if (RelayChip) gpiod_chip_close (RelayChip);
+
+    InputCount = 0;
+    echttp_fastscan (0, 0);
+    RelayLastScan = 0; // Do not keep data that relates to different points
 
     int chip = houseconfig_integer (0, ".relays.iochip");
     char path[127];
@@ -164,6 +211,8 @@ const char *houserelays_gpio_refresh (void) {
     if (Relays) free(Relays);
     Relays = calloc(sizeof(struct RelayMap), RelaysCount);
     if (!Relays) return "no more memory";
+    if (InputIndex) free(InputIndex);
+    InputIndex = calloc (sizeof(int), RelaysCount);
 
     RelayChip = gpiod_chip_open(path);
     if (!RelayChip) return "cannot access GPIO";
@@ -203,6 +252,7 @@ const char *houserelays_gpio_refresh (void) {
             } else {
                 gpiod_line_settings_set_direction (settings, GPIOD_LINE_DIRECTION_INPUT);
                 gpiod_line_settings_set_edge_detection (settings, GPIOD_LINE_EDGE_NONE);
+                InputIndex[InputCount++] = i;
             }
 
             const unsigned iopin = Relays[i].gpio;
@@ -235,9 +285,15 @@ endv2init:
                 gpiod_line_set_value(Relays[i].line, Relays[i].off);
             } else {
                 gpiod_line_request_input (Relays[i].line, Relays[i].name);
+                InputIndex[InputCount++] = i;
             }
 #endif
         }
+    }
+
+    if (InputCount > 0) {
+        memset (RelayTimestamps, 0, sizeof(RelayTimestamps));
+        echttp_fastscan (houserelays_gpio_scanner, HOUSE_GPIO_SEQUENCE_PERIOD);
     }
     return 0;
 }
@@ -341,6 +397,87 @@ int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
     }
     Relays[point].commanded = state;
     return 1;
+}
+
+static int houserelays_gpio_next (int index) {
+    return (++index) % HOUSE_GPIO_SEQUENCE_DEPTH;
+}
+
+int houserelays_gpio_changes (long long since, char *buffer, int size) {
+
+    if (RelayLastScan <= since) {
+       // (If there are no input points, then RelayLastScan remains at 0.)
+       return snprintf (buffer, size, "{}"); // No data present.
+    }
+
+    int start;
+    int end = RelayLastScan;
+    int origin = houserelays_gpio_to_sequence (since);
+
+    if (RelayTimestamps[origin] != since) since = 0; // Force full report.
+
+    if (since) {
+       start = houserelays_gpio_next (origin);
+    } else {
+       start = end;
+       do {
+           start = houserelays_gpio_next (start);
+       } while (RelayTimestamps[start] <= since);
+    }
+
+    int cursor = snprintf (buffer, size,
+                           "{\"start\":%lld,\"step\":%d,\"end\":%lld,\"data\":",
+                           RelayTimestamps[start],
+                           HOUSE_GPIO_SEQUENCE_PERIOD,
+                           RelayTimestamps[end]-RelayTimestamps[start]);
+    if (cursor >= size) return 0; // Abort.
+
+    int i;
+    int pointcount = 0;
+    const char *sep1 = "{";
+    const char *terminator = "}}"; // Default is no point change found.
+    for (i = 0; i < InputCount; ++i) {
+       int haschanged;
+       int point = InputIndex[i];
+       if (since) {
+           int haschanged = 0;
+           int j = start;
+           int reference = Relays[point].sequence[origin];
+           while (1) {
+               if (Relays[point].sequence[j] != reference) {
+                  haschanged = 1;
+                  break;
+               }
+               if (j == end) break;
+               j = houserelays_gpio_next (j);
+           }
+           if (!haschanged) continue; // Skip this point (no change).
+       }
+       // Now there is at least one point included.
+       terminator = "]}}";
+       pointcount += 1;
+
+       cursor += snprintf (buffer+cursor, size-cursor,
+                           "%s\"%s\":", sep1, Relays[point].name);
+       if (cursor >= size) return 0; // Abort.
+       sep1 = "],";
+
+       int j = start;
+       char sep2 = '[';
+       while (1) {
+           cursor += snprintf (buffer+cursor, size-cursor,
+                               "%c%d", sep2, Relays[point].sequence[j]);
+           if (cursor >= size) return 0; // Abort.
+           if (j == end) break;
+           sep2 = ',';
+           j = houserelays_gpio_next (j);
+       }
+    }
+    if (pointcount <= 0) {
+       return snprintf (buffer, size, "{}"); // No new data available.
+    }
+    cursor += snprintf (buffer+cursor, size-cursor, terminator);
+    return cursor;
 }
 
 void houserelays_gpio_periodic (time_t now) {

@@ -1,5 +1,5 @@
 Source: houserelays
-Version: 1.5
+Version: 1.6
 Section: Web servers
 Maintainer: Pascal Martin <pascal.fb.martin@gmail.com>
 Priority: optional
@@ -8,9 +8,9 @@ Standard-Version: 4.7.0
 Package: houserelays
 Architecture: {{arch}}
 Depends: houseportal,libgpiod2
-Description: A House service to control relays through GPIO
+Description: A House service to control and read relay states through GPIO
  HouseRelays is part of the House suite of web services.
  .
- HouseRelays allow remote services to control relays wired to local GPIO.
- This service is mostly intended for Raspberry Pi or similar boards.
+ HouseRelays allow remote services to control and read relays wired to local
+ GPIO. This service is mostly intended for Raspberry Pi or similar boards.
 

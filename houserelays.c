@@ -42,11 +42,11 @@
 #include "houserelays_gpio.h"
 
 static char HostName[256];
+static char JsonBuffer[65537];
 
 
 static const char *relays_status (const char *method, const char *uri,
                                    const char *data, int length) {
-    static char buffer[65537];
     ParserToken token[1024];
     char pool[65537];
     int count = houserelays_gpio_count();
@@ -79,13 +79,14 @@ static const char *relays_status (const char *method, const char *uri,
         if (gear && gear[0] != 0)
             echttp_json_add_string (context, point, "gear", gear);
     }
-    const char *error = echttp_json_export (context, buffer, 65537);
+    const char *error =
+        echttp_json_export (context, JsonBuffer, sizeof(JsonBuffer));
     if (error) {
         echttp_error (500, error);
         return "";
     }
     echttp_content_type_json ();
-    return buffer;
+    return JsonBuffer;
 }
 
 static const char *relays_set (const char *method, const char *uri,
@@ -137,6 +138,29 @@ static const char *relays_set (const char *method, const char *uri,
         return "";
     }
     return relays_status (method, uri, data, length);
+}
+
+static const char *relays_changes (const char *method, const char *uri,
+                                   const char *data, int length) {
+
+    const char *sincepar = echttp_parameter_get("since");
+    long long since = 0;
+    if (sincepar) since = atoll(sincepar);
+
+    int cursor = snprintf (JsonBuffer, sizeof(JsonBuffer),
+                           "{\"host\":\"%s\",\"timestamp\":%lld,\"sequence:",
+                           HostName, (long long)time(0));
+
+    cursor += houserelays_gpio_changes (since,
+                                        JsonBuffer+cursor,
+                                        sizeof(JsonBuffer)-cursor);
+    if (cursor >= sizeof(JsonBuffer)) return "";
+
+    cursor += snprintf (JsonBuffer+cursor, sizeof(JsonBuffer)-cursor, "}");
+    if (cursor >= sizeof(JsonBuffer)) return "";
+
+    echttp_content_type_json ();
+    return JsonBuffer;
 }
 
 static const char *relays_config (const char *method, const char *uri,
@@ -225,8 +249,9 @@ int main (int argc, const char **argv) {
     echttp_cors_allow_method("GET");
     echttp_protect (0, relays_protect);
 
-    echttp_route_uri ("/relays/status", relays_status);
-    echttp_route_uri ("/relays/set",    relays_set);
+    echttp_route_uri ("/relays/status",  relays_status);
+    echttp_route_uri ("/relays/set",     relays_set);
+    echttp_route_uri ("/relays/changes", relays_changes);
 
     echttp_route_uri ("/relays/config", relays_config);
 
