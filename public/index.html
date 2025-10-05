@@ -7,13 +7,14 @@ function relayShowStatus (response) {
 
     var title = response.host+' - Relays';
     document.getElementsByTagName ('title')[0].innerHTML = title;
-    document.getElementById('portal').href = 'http://'+response.proxy+'/index.html';
 
-    var state = response.control.status;
-    for (const [key, value] of Object.entries(state)) {
+    var points = response.control.status;
+    for (const [key, value] of Object.entries(points)) {
         var state = document.getElementById ('state-'+key);
+        var mode = document.getElementById ('mode-'+key);
         var button = document.getElementById ('button-'+key);
-        button.disabled = false;
+        button.disabled = (value.mode != 'output');
+        mode.innerHTML = value.mode;
         if (value.state == 'on') {
             state.innerHTML = 'ON';
             button.innerHTML = 'OFF';
@@ -66,6 +67,13 @@ window.onload = function() {
            var inner = document.createElement("td");
            var label = document.createElement("span");
            label.innerHTML = point.name;
+           inner.appendChild(label);
+           outer.appendChild(inner);
+
+           inner = document.createElement("td");
+           label = document.createElement("span");
+           label.innerHTML = '(wait)';
+           label.id = 'mode-'+point.name;
            inner.appendChild(label);
            outer.appendChild(inner);
 
@@ -141,7 +149,6 @@ window.onload = function() {
    <tr><td>
    <table class="housetop">
    <tr>
-   <td><a id="portal" href="/index.html">Portal</a></td>
    <td><span>Relays</span></td>
    <td><a href="/relays/events.html">Events</a></td>
    <td><a href="/relays/config.html">Config</a></td>
@@ -151,12 +158,13 @@ window.onload = function() {
    </table>
    <table class="housewidetable iolist" border="0">
       <tr>
-         <th width="14%">NAME</th>
+         <th width="10%">NAME</th>
+         <th width="5%">MODE</th>
          <th width="10%">STATE</th>
          <th width="10%">CONTROL</th>
-         <th width="14%">CONNECTION</th>
-         <th width="14%">GEAR</th>
-         <th width="52%">DESCRIPTION</th>
+         <th width="10%">CONNECTION</th>
+         <th width="10%">GEAR</th>
+         <th width="45%">DESCRIPTION</th>
       </tr>
    </table>
 </body>

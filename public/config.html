@@ -20,6 +20,7 @@ function saveConfig () {
         var point = new Object();
         point.name = form.iolistform[prefix+'name'].value;
         point.gpio = parseInt(form.iolistform[prefix+'gpio'].value);
+        point.mode = form.iolistform[prefix+'mode'].value;
         var on = form.iolistform[prefix+'level'].value;
         if (on === 'HIGH')
             point.on = 1;
@@ -169,24 +170,8 @@ function relayConfig () {
     command.send(null);
 }
 
-function relayShowStatus (response) {
-    document.getElementById('portal').href = 'http://'+response.proxy+'/index.html';
-}
-
-function relayStatus () {
-    var command = new XMLHttpRequest();
-    command.open("GET", "/relays/status");
-    command.onreadystatechange = function () {
-        if (command.readyState === 4 && command.status === 200) {
-            relayShowStatus (JSON.parse(command.responseText));
-        }
-    }
-    command.send(null);
-}
-
 window.onload = function() {
    relayConfig();
-   relayStatus();
 };
 </script>
 <head>
@@ -197,7 +182,6 @@ window.onload = function() {
    <tr><td>
    <table class="housetop">
    <tr>
-   <td><a id="portal" href="/index.html">Portal</a></td>
    <td><a href="/relays/index.html">Relays</a></td>
    <td><a href="/relays/events.html">Events</a></td>
    <td><span>Config</span></td>
