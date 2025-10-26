@@ -86,7 +86,13 @@ The basic services included are:
 GET /relays/status
 ```
 
-Returns a status JSON object that lists each relay by name. Each relay is itself an object with state, command and gear elements and an optional pulse element. The state and command elements are either on or 1 (active), or else off or 0 (inactive). The pulse element is present if there is a pulse timer active (see below for more information about pulses) and indicates the remaining number of seconds during which the current state will be maintained.
+Returns a status JSON object that lists each relay by name. Each relay is itself an object with state, command and gear elements and an optional pulse element. The state and command elements are either on or 1 (active), or else off or 0 (inactive). The pulse element is present if there is a pulse timer active (see below for more information about pulses) and indicates the time until which the current state will be maintained.
+
+This returns data in the JSON format with the following structure:
+
+- host:      Name of the host machine this service runs on.
+- timestamp: Time of the response.
+- control.status:  An object that describes each point (state, command, gear and pulse).
 
 ```
 GET /relays/set?point=NAME&state=off|0|on|1[&cause=TEXT]
@@ -100,24 +106,31 @@ The point name "all" denotes all points served by this web server. Use with caut
 The optional cause parameter is reflected in the event that records the control. This is a way to describe what caused the control to be issued, thus the name.
 
 ```
-GET /relays/changes[?since=MILLISECONDS]
+GET /relays/changes[?since=MILLISECONDS][&sync=0|1]
 ```
 
 Return a JSON array of the recent input state changes. The history is not saved to disk and the server keeps only a fixed number of state changes. The client must request new changes at most every 5 seconds.
 
 This endpoint returns no data if there is no input point configured. Output points are never included here.
 
+If the `sync` option is present and its value is 1, the response also includes the state of all points (not just input) in the same `control.status` object as returned by `/relays/status`. This option is intended to keep the data from requests for changes and status properly ordered. The client must process the changes data first, then the status data. The changes data represents changes that occurred prior to the current status. Future changes requests will include changes subsequent to that status. This way the client will not process the list of changes out of order compared to status.
+
+A client requesting both changes and status must use the `/relays/changes` endpoint instead of `/relays/status`. The `sync` option may be used at a longer interval than the poll (i.e. the sync option may be set every N requests only).
+
+> This is similar to how the [DNP 3](https://www.dnp.org/) standard's keeps event and static polls synchronized. The main difference is that DNP 3 keeps the `since` context on the server side, i.e. in the outstation, while this design makes the client responsible for maintaining that context (making multi-clients support much simpler).
+
 This returns data in the JSON format with the following structure:
 
-- host:      Name of the host machine this service runs on.
-- timestamp: Time of the response.
-- sequence:  An object that describes the input points that changed.
-- sequence.start: Time of the oldest state.
-- sequence.step:  Interval between two consecutive values.
-- sequend.end:    Time of the most recent state (relative to sequence.start).
-- sequence.data:  An object that lists every input that changed. Each input is an array of sequential values.
+- host:                   Name of the host machine this service runs on.
+- timestamp:              Time of the response.
+- control.changes:        An object that describes the input points that changed.
+- control.changes.start:  Time of the oldest state.
+- control.changes.step:   Interval between two consecutive values.
+- control.sequend.end:    Time of the most recent state (relative to changes.start).
+- control.changes.data:   An object that lists every input point that changed. Each input point is an array of sequential values (i.e. a time series) sampled at `control.changes.step` intervals.
+- control.status:         If sync requested. See `/relays/status`.
 
-All time values in the sequence object are in millisecond units.
+All time values in the control.changes object are in millisecond units.
 
 ```
 GET /relays/config

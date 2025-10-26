@@ -49,36 +49,18 @@ static const char *relays_status (const char *method, const char *uri,
                                    const char *data, int length) {
     ParserToken token[1024];
     char pool[65537];
-    int count = houserelays_gpio_count();
-    int i;
 
     ParserContext context = echttp_json_start (token, 1024, pool, 65537);
 
     int root = echttp_json_add_object (context, 0, 0);
     echttp_json_add_string (context, root, "host", HostName);
     echttp_json_add_string (context, root, "proxy", houseportal_server());
-    echttp_json_add_integer (context, root, "timestamp", (long)time(0));
+    echttp_json_add_integer (context, root, "timestamp", (long long)time(0));
     int top = echttp_json_add_object (context, root, "control");
+
     int container = echttp_json_add_object (context, top, "status");
+    houserelays_gpio_status (context, container);
 
-    for (i = 0; i < count; ++i) {
-        time_t pulsed = houserelays_gpio_deadline(i);
-        const char *name = houserelays_gpio_name(i);
-        const char *mode = houserelays_gpio_mode(i);
-        const char *status = houserelays_gpio_failure(i);
-        if (!status) status = houserelays_gpio_get(i)?"on":"off";
-        const char *commanded = houserelays_gpio_commanded(i)?"on":"off";
-        const char *gear = houserelays_gpio_gear(i);
-
-        int point = echttp_json_add_object (context, container, name);
-        if (mode) echttp_json_add_string (context, point, "mode", mode);
-        echttp_json_add_string (context, point, "state", status);
-        echttp_json_add_string (context, point, "command", commanded);
-        if (pulsed)
-            echttp_json_add_integer (context, point, "pulse", (int)pulsed);
-        if (gear && gear[0] != 0)
-            echttp_json_add_string (context, point, "gear", gear);
-    }
     const char *error =
         echttp_json_export (context, JsonBuffer, sizeof(JsonBuffer));
     if (error) {
@@ -98,8 +80,6 @@ static const char *relays_set (const char *method, const char *uri,
     const char *cause = echttp_parameter_get("cause");
     int state;
     int pulse;
-    int i;
-    int count = houserelays_gpio_count();
     int found = 0;
 
     if (!point) {
@@ -125,11 +105,18 @@ static const char *relays_set (const char *method, const char *uri,
         return "";
     }
 
-    for (i = 0; i < count; ++i) {
-       if ((strcmp (point, "all") == 0) ||
-           (strcmp (point, houserelays_gpio_name(i)) == 0)) {
-           found = 1;
+    if (!strcmp (point, "all")) {
+       int count = houserelays_gpio_count();
+       int i;
+       for (i = 0; i < count; ++i) {
            houserelays_gpio_set (i, state, pulse, cause);
+       }
+       found = 1;
+    } else {
+       int i = houserelays_gpio_search (point);
+       if (i >= 0) {
+           houserelays_gpio_set (i, state, pulse, cause);
+           found = 1;
        }
     }
 
@@ -143,22 +130,37 @@ static const char *relays_set (const char *method, const char *uri,
 static const char *relays_changes (const char *method, const char *uri,
                                    const char *data, int length) {
 
+    const char *syncpar = echttp_parameter_get("sync");
     const char *sincepar = echttp_parameter_get("since");
+    int sync = 0;
     long long since = 0;
+    if (syncpar) sync = atoi(syncpar);
     if (sincepar) since = atoll(sincepar);
 
-    int cursor = snprintf (JsonBuffer, sizeof(JsonBuffer),
-                           "{\"host\":\"%s\",\"timestamp\":%lld,\"sequence:",
-                           HostName, (long long)time(0));
+    ParserToken token[2048];
+    char pool[65537];
 
-    cursor += houserelays_gpio_changes (since,
-                                        JsonBuffer+cursor,
-                                        sizeof(JsonBuffer)-cursor);
-    if (cursor >= sizeof(JsonBuffer)) return "";
+    ParserContext context = echttp_json_start (token, 2048, pool, 65537);
 
-    cursor += snprintf (JsonBuffer+cursor, sizeof(JsonBuffer)-cursor, "}");
-    if (cursor >= sizeof(JsonBuffer)) return "";
+    int root = echttp_json_add_object (context, 0, 0);
+    echttp_json_add_string (context, root, "host", HostName);
+    echttp_json_add_integer (context, root, "timestamp", (long long)time(0));
+    int top = echttp_json_add_object (context, root, "control");
 
+    int container = echttp_json_add_object (context, top, "changes");
+    houserelays_gpio_changes (since, context, container);
+
+    if (sync) {
+        container = echttp_json_add_object (context, top, "status");
+        houserelays_gpio_status (context, container);
+    }
+
+    const char *error =
+        echttp_json_export (context, JsonBuffer, sizeof(JsonBuffer));
+    if (error) {
+        echttp_error (500, error);
+        return "";
+    }
     echttp_content_type_json ();
     return JsonBuffer;
 }
@@ -208,7 +210,7 @@ static void relays_protect (const char *method, const char *uri) {
 
 int main (int argc, const char **argv) {
 
-    char defaultoption[256];
+    char defaultoption[266];
 
     // These strange statements are to make sure that fds 0 to 2 are
     // reserved, since this application might output some errors.

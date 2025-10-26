@@ -31,38 +31,13 @@
  *
  *    Re-evaluate the GPIO setup after the configuration changed.
  *
+ * int houserelays_gpio_search (const char *name);
+ *
+ *    Search for the index of the named point. Returns -1 if not found.
+ *
  * int houserelays_gpio_count (void);
  *
  *    Return the number of configured relay points available.
- *
- * const char *houserelays_gpio_name (int point);
- *
- *    Return the name of a relay point. The point name serves as an
- *    identifier for application access.
- *
- * const char *houserelays_gpio_failure (int point);
- *
- *    Return a string describing the failure, or a null pointer if healthy.
- *
- * const char *houserelays_gpio_mode (int point);
- *
- *    Return the current mode of the selected point, or a null pointer if
- *    the mode is undefined (should normally not happen).
- *
- * const char *houserelays_gpio_description (int point);
- * const char *houserelays_gpio_gear (int point);
- *
- *    Return the point's attributes. This is just text intended to help
- *    the user remember what the point is, for example it may match labels
- *    on the hardware. Most equipment labels each relay 1, 2, 3, etc. The
- *    description would match this. The application should not assume that
- *    the description text follow some specific semantic or syntax.
- *
- * int houserelays_gpio_commanded (int point);
- * time_t houserelays_gpio_deadline (int point);
- *
- *    Return the last commanded state, or the command deadline, for
- *    the specified relay point.
  *
  * int houserelays_gpio_get (int point);
  *
@@ -77,12 +52,16 @@
  *
  *    Return 1 on success, 0 if the point is not known and -1 on error.
  *
- * int houserelays_gpio_changes (long long since, char *buffer, int size);
+ * void houserelays_gpio_status (ParserContext context, int root);
  *
- *    Populate the buffer with an history of the input changes that occurred
- *    after the provided millisecond timestamp. The history takes the form of
- *    a JSON structure. Point that have not changed are ommited.
- *    If since is 0, return the complete recent history.
+ *    Populate the context with the list of known points and their values.
+ *
+ * void houserelays_gpio_changes (long long since,
+ *                                ParserContext context, int root);
+ *
+ *    Populate the context with an history of the input changes that occurred
+ *    after the provided millisecond timestamp. Point that have not changed
+ *    are ommited. If since is 0, return the complete recent history.
  *
  * void houserelays_gpio_periodic (void);
  *
@@ -93,6 +72,9 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <gpiod.h>
+
+#include "echttp_hash.h"
+#include "echttp_json.h"
 
 #include "houselog.h"
 #include "houseconfig.h"
@@ -113,6 +95,7 @@ struct RelayMap {
     const char *name;
     const char *gear;
     const char *desc;
+    unsigned int signature; // Accelerates search.
     int mode;
     int gpio;
     int on;
@@ -158,6 +141,15 @@ static int houserelays_gpio_to_mode (const char *text) {
    return HOUSE_GPIO_MODE_INPUT; // Safer, no short circuit.
 }
 
+static const char *houserelays_gpio_from_mode (int point) {
+    if (point < 0 || point > RelaysCount) return 0;
+    switch (Relays[point].mode) {
+    case HOUSE_GPIO_MODE_OUTPUT: return "output";
+    case HOUSE_GPIO_MODE_INPUT:  return "input";
+    }
+    return 0;
+}
+
 static int houserelays_gpio_to_sequence (long long timestamp) {
     return (int) ((timestamp / HOUSE_GPIO_SEQUENCE_PERIOD) % HOUSE_GPIO_SEQUENCE_DEPTH);
 }
@@ -190,6 +182,7 @@ const char *houserelays_gpio_refresh (void) {
         gpiod_line_release (Relays[i].line);
 #endif
         Relays[i].name = 0;
+        Relays[i].signature = 0;
     }
     if (RelayChip) gpiod_chip_close (RelayChip);
 
@@ -228,6 +221,7 @@ const char *houserelays_gpio_refresh (void) {
             Relays[i].mode =
                 houserelays_gpio_to_mode (houseconfig_string (point, ".mode"));
             Relays[i].desc = houseconfig_string (point, ".description");
+            Relays[i].signature = echttp_hash_signature (Relays[i].name);
             Relays[i].gpio = houseconfig_integer (point, ".gpio");
             Relays[i].on  = houseconfig_integer (point, ".on") & 1;
             if (echttp_isdebug()) fprintf (stderr, "found point %s, gpio %d, on %d %s\n", Relays[i].name, Relays[i].gpio, Relays[i].on, Relays[i].desc);
@@ -298,46 +292,18 @@ endv2init:
     return 0;
 }
 
+int houserelays_gpio_search (const char *name) {
+    int i;
+    unsigned int signature = echttp_hash_signature (name);
+    for (i = 0; i < RelaysCount; ++i) {
+       if (Relays[i].signature != signature) continue; // Faster than strcmp()
+       if (!strcmp (name, Relays[i].name)) return i;
+    }
+    return -1;
+}
+
 int houserelays_gpio_count (void) {
     return RelaysCount;
-}
-
-const char *houserelays_gpio_name (int point) {
-    if (point < 0 || point > RelaysCount) return 0;
-    return Relays[point].name;
-}
-
-const char *houserelays_gpio_gear (int point) {
-    if (point < 0 || point > RelaysCount) return 0;
-    return Relays[point].gear;
-}
-
-const char *houserelays_gpio_mode (int point) {
-    if (point < 0 || point > RelaysCount) return 0;
-    switch (Relays[point].mode) {
-    case HOUSE_GPIO_MODE_OUTPUT: return "output";
-    case HOUSE_GPIO_MODE_INPUT:  return "input";
-    }
-    return 0;
-}
-
-const char *houserelays_gpio_description (int point) {
-    if (point < 0 || point > RelaysCount) return 0;
-    return Relays[point].desc;
-}
-
-const char *houserelays_gpio_failure (int point) {
-    return 0; // A GPIO never fail, or never report it to us..
-}
-
-int houserelays_gpio_commanded (int point) {
-    if (point < 0 || point > RelaysCount) return 0;
-    return Relays[point].commanded;
-}
-
-time_t houserelays_gpio_deadline (int point) {
-    if (point < 0 || point > RelaysCount) return 0;
-    return Relays[point].deadline;
 }
 
 int houserelays_gpio_get (int point) {
@@ -403,11 +369,34 @@ static int houserelays_gpio_next (int index) {
     return (++index) % HOUSE_GPIO_SEQUENCE_DEPTH;
 }
 
-int houserelays_gpio_changes (long long since, char *buffer, int size) {
+void houserelays_gpio_status (ParserContext context, int root) {
+
+    int i;
+    for (i = 0; i < RelaysCount; ++i) {
+       const char *mode = houserelays_gpio_from_mode(i);
+       const char *status = houserelays_gpio_get(i)?"on":"off";
+       const char *commanded = Relays[i].commanded?"on":"off";
+
+       int point = echttp_json_add_object (context, root, Relays[i].name);
+       if (mode) echttp_json_add_string (context, point, "mode", mode);
+       echttp_json_add_string (context, point, "state", status);
+       if (Relays[i].mode == HOUSE_GPIO_MODE_OUTPUT)
+           echttp_json_add_string (context, point, "command", commanded);
+       if (Relays[i].deadline) {
+           echttp_json_add_integer
+               (context, point, "pulse", Relays[i].deadline);
+       }
+       if (Relays[i].gear && (Relays[i].gear[0] != 0))
+           echttp_json_add_string (context, point, "gear", Relays[i].gear);
+    }
+}
+
+void houserelays_gpio_changes (long long since,
+                               ParserContext context, int root) {
 
     if (RelayLastScan <= since) {
        // (If there are no input points, then RelayLastScan remains at 0.)
-       return snprintf (buffer, size, "{}"); // No data present.
+       return;
     }
 
     int start;
@@ -425,19 +414,14 @@ int houserelays_gpio_changes (long long since, char *buffer, int size) {
        } while (RelayTimestamps[start] <= since);
     }
 
-    int cursor = snprintf (buffer, size,
-                           "{\"start\":%lld,\"step\":%d,\"end\":%lld,\"data\":",
-                           RelayTimestamps[start],
-                           HOUSE_GPIO_SEQUENCE_PERIOD,
-                           RelayTimestamps[end]-RelayTimestamps[start]);
-    if (cursor >= size) return 0; // Abort.
+    echttp_json_add_integer (context, root, "start", RelayTimestamps[start]);
+    echttp_json_add_integer (context, root, "step", HOUSE_GPIO_SEQUENCE_PERIOD);
+    echttp_json_add_integer (context, root, "end",
+                             RelayTimestamps[end]-RelayTimestamps[start]);
 
+    int top = echttp_json_add_object (context, root, "data");
     int i;
-    int pointcount = 0;
-    const char *sep1 = "{";
-    const char *terminator = "}}"; // Default is no point change found.
     for (i = 0; i < InputCount; ++i) {
-       int haschanged;
        int point = InputIndex[i];
        if (since) {
            int haschanged = 0;
@@ -453,31 +437,16 @@ int houserelays_gpio_changes (long long since, char *buffer, int size) {
            }
            if (!haschanged) continue; // Skip this point (no change).
        }
-       // Now there is at least one point included.
-       terminator = "]}}";
-       pointcount += 1;
 
-       cursor += snprintf (buffer+cursor, size-cursor,
-                           "%s\"%s\":", sep1, Relays[point].name);
-       if (cursor >= size) return 0; // Abort.
-       sep1 = "],";
-
+       int array = echttp_json_add_array (context, top, Relays[point].name);
        int j = start;
-       char sep2 = '[';
        while (1) {
-           cursor += snprintf (buffer+cursor, size-cursor,
-                               "%c%d", sep2, Relays[point].sequence[j]);
-           if (cursor >= size) return 0; // Abort.
+           echttp_json_add_integer
+               (context, array, 0, Relays[point].sequence[j]);
            if (j == end) break;
-           sep2 = ',';
            j = houserelays_gpio_next (j);
        }
     }
-    if (pointcount <= 0) {
-       return snprintf (buffer, size, "{}"); // No new data available.
-    }
-    cursor += snprintf (buffer+cursor, size-cursor, terminator);
-    return cursor;
 }
 
 void houserelays_gpio_periodic (time_t now) {

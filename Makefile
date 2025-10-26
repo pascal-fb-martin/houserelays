@@ -46,7 +46,7 @@ clean:
 rebuild: clean all
 
 %.o: %.c
-	gcc $(GPIODOPT) -c -Os -o $@ $<
+	gcc $(GPIODOPT) -c -Wall -Os -o $@ $<
 
 houserelays: $(OBJS)
 	gcc -Os -o houserelays $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lgpiod -lmagic -lrt

@@ -24,20 +24,17 @@
 const char *houserelays_gpio_configure (int argc, const char **argv);
 const char *houserelays_gpio_refresh (void);
 
+int houserelays_gpio_search (const char *name);
 int houserelays_gpio_count (void);
-const char *houserelays_gpio_name (int point);
-const char *houserelays_gpio_mode (int point);
-const char *houserelays_gpio_gear (int point);
-const char *houserelays_gpio_description (int point);
 
 const char *houserelays_gpio_failure (int point);
 
-int    houserelays_gpio_commanded (int point);
-time_t houserelays_gpio_deadline  (int point);
-int    houserelays_gpio_get       (int point);
-int    houserelays_gpio_set       (int point, int state, int pulse, const char *cause);
+int houserelays_gpio_get (int point);
+int houserelays_gpio_set (int point, int state, int pulse, const char *cause);
 
-int houserelays_gpio_changes (long long since, char *buffer, int size);
+void houserelays_gpio_status (ParserContext context, int root);
+void houserelays_gpio_changes (long long since,
+                               ParserContext context, int root);
 
 void houserelays_gpio_periodic (time_t now);
 
