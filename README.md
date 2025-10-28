@@ -111,7 +111,7 @@ GET /relays/changes[?since=MILLISECONDS][&sync=0|1]
 
 Return a JSON array of the recent input state changes. The history is not saved to disk and the server keeps only a fixed number of state changes. The client must request new changes at most every 5 seconds.
 
-This endpoint returns no data if there is no input point configured. Output points are never included here.
+This endpoint returns no data if there is no input point configured. No change history is provided for output points. When clients request for changes, the input points are scanned at a higher speed than the default one second, typically at a 100 milliseconds rate. Since this fast scan only occurs when clients are active, the first request always return no changes, i.e. an empty object: the client must be prepared for this. This fast scan rate stops when no request for changes has been made for some time (typically 12 seconds).
 
 If the `sync` option is present and its value is 1, the response also includes the state of all points (not just input) in the same `control.status` object as returned by `/relays/status`. This option is intended to keep the data from requests for changes and status properly ordered. The client must process the changes data first, then the status data. The changes data represents changes that occurred prior to the current status. Future changes requests will include changes subsequent to that status. This way the client will not process the list of changes out of order compared to status.
 
@@ -123,12 +123,12 @@ This returns data in the JSON format with the following structure:
 
 - host:                   Name of the host machine this service runs on.
 - timestamp:              Time of the response.
-- control.changes:        An object that describes the input points that changed.
+- control.changes:        An object that describes the input points that changed, or an empty object when no change history is available.
 - control.changes.start:  Time of the oldest state.
 - control.changes.step:   Interval between two consecutive values.
 - control.sequend.end:    Time of the most recent state (relative to changes.start).
 - control.changes.data:   An object that lists every input point that changed. Each input point is an array of sequential values (i.e. a time series) sampled at `control.changes.step` intervals.
-- control.status:         If sync requested. See `/relays/status`.
+- control.status:         If sync is requested. See `/relays/status`.
 
 All time values in the control.changes object are in millisecond units.
 
