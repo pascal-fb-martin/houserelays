@@ -125,8 +125,13 @@ static time_t RelayFastScanEnabled = 0; // Fastscan is on a timer.
 
 static struct gpiod_chip *RelayChip = 0;
 
+static const char *DebugChip = 0;
 
 const char *houserelays_gpio_configure (int argc, const char **argv) {
+    int i;
+    for (i = 1; i < argc; ++i) {
+        echttp_option_match ("-chip=", argv[i], &DebugChip);
+    }
     return houserelays_gpio_refresh ();
 }
 
@@ -214,9 +219,13 @@ const char *houserelays_gpio_refresh (void) {
     InputCount = 0;
     houserelays_gpio_fast (0); // Will be enabled later, on demand.
 
-    int chip = houseconfig_integer (0, ".relays.iochip");
     char path[127];
-    snprintf (path, sizeof(path), "/dev/gpiochip%d", chip);
+    if (DebugChip) {
+        snprintf (path, sizeof(path), "/dev/gpiochip%s", DebugChip);
+    } else {
+        int chip = houseconfig_integer (0, ".relays.iochip");
+        snprintf (path, sizeof(path), "/dev/gpiochip%d", chip);
+    }
 
     int relays = houseconfig_array (0, ".relays.points");
     if (relays < 0) return "cannot find points array";
