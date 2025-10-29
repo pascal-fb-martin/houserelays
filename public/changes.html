@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+<link rel=stylesheet type="text/css" href="/house.css" title="House">
+<script>
+
+const Depth = 64;
+var relayLastTimestamp = 0;
+
+var relayLastHistory = new Array();
+
+function relayShowInput (points) {
+
+    var table = document.getElementById ('pointlist');
+    for (var i = table.rows.length - 1; i > 0; i--) {
+        table.deleteRow(i);
+    }
+
+    var present = new Array();
+    for (const [key, value] of Object.entries(points).sort()) {
+
+        if (value.mode !== "input") continue;
+        var row = table.insertRow();
+
+        var column = document.createElement("td");
+        column.innerHTML = key;
+        row.appendChild(column);
+
+        var column = document.createElement("td");
+        column.id = 'graph-'+key;
+        row.appendChild(column);
+
+        present[key] = true;
+    }
+    // Purge input points that have disappeared.
+    for (const [key, value] of Object.entries(relayLastHistory)) {
+        if (!present[key]) delete relayLastHistory[key];
+    }
+}
+
+function relayShowChanges (response) {
+
+    if (response.control.status) {
+        var title = response.host+' - Changes';
+        document.getElementsByTagName ('title')[0].innerHTML = title;
+        relayShowInput (response.control.status);
+    }
+
+    var points = response.control.changes.data;
+    if (!points) return;
+
+    // Update the local history of the input points that changed.
+    var present = new Array();
+    for (const [key, value] of Object.entries(points)) {
+        var history;
+        present[key] = true;
+        if (relayLastHistory[key]) {
+            history = relayLastHistory[key].concat (value);
+            if (history.length > Depth) {
+               history = history.slice (history.length-Depth);
+            }
+        } else {
+            history = value;
+        }
+        relayLastHistory[key] = history;
+    }
+    // Update the local history of the input points that  did not change,
+    // and then refresh the display.
+    var length = response.control.changes.end / response.control.changes.step;
+    for (const [key, value] of Object.entries(relayLastHistory)) {
+        if (!present[key]) {
+           var history = relayLastHistory[key];
+           var lastvalue = history[history.length-1];
+           for (var i = 0; i <= length; ++i) {
+              history.push (lastvalue);
+           }
+           if (history.length > Depth) {
+               history = history.slice (history.length-Depth);
+           }
+           relayLastHistory[key] = history;
+        }
+        var graph = document.getElementById ('graph-'+key);
+        graph.innerHTML = relayLastHistory[key].join("").replace(/0/g, "&#x23BD").replace(/1/g, "&#x23BA"); // TBD: SVG graph
+    }
+    relayLastTimestamp =
+        response.control.changes.start + response.control.changes.end;
+}
+
+function relayChanges () {
+    var url = "/relays/changes" + (relayLastTimestamp?("?since="+relayLastTimestamp):"?sync=1");
+    var command = new XMLHttpRequest();
+    command.open("GET", url);
+    command.onreadystatechange = function () {
+        if (command.readyState === 4 && command.status === 200) {
+            relayShowChanges (JSON.parse(command.responseText));
+        }
+    }
+    command.send(null);
+}
+
+window.onload = function() {
+
+   relayChanges();
+   setInterval (relayChanges, 500);
+};
+</script>
+<head>
+   <title>Changes</title>
+</head>
+<body>
+   <table class="housetopcontainer">
+   <tr><td>
+   <table class="housetop">
+   <tr>
+   <td><a href="/relays/index.html">Relays</a></td>
+   <td><span>Changes</span></td>
+   <td><a href="/relays/events.html">Events</a></td>
+   <td><a href="/relays/config.html">Config</a></td>
+   </tr>
+   </table>
+   </td></tr>
+   </table>
+   <table id="pointlist" class="housewidetable iolist" border="0">
+      <tr>
+         <th width="10%">NAME</th>
+         <th width="90%">DATA</th>
+      </tr>
+   </table>
+</body>
+</html>
+
