@@ -31,6 +31,9 @@ function relayShowInput (points) {
         row.appendChild(column);
 
         present[key] = true;
+        if (!relayLastHistory[key]) { // New point.
+           relayLastHistory[key] = new Array();
+        }
     }
     // Purge input points that have disappeared.
     for (const [key, value] of Object.entries(relayLastHistory)) {
@@ -64,13 +67,24 @@ function relayShowChanges (response) {
         }
         relayLastHistory[key] = history;
     }
-    // Update the local history of the input points that  did not change,
+    // Update the local history of the input points that did not change,
     // and then refresh the display.
+    // Note that if a new point was detected, and there is no changes
+    // reported for that point, its latest value can be found in the
+    // response.control.status structure.
+    //
     var length = response.control.changes.end / response.control.changes.step;
     for (const [key, value] of Object.entries(relayLastHistory)) {
         if (!present[key]) {
            var history = relayLastHistory[key];
-           var lastvalue = history[history.length-1];
+           var lastvalue = 0;
+           if (!history.length) { // New point with no change.
+               if (response.control.status) { // Extra careful.
+                  lastvalue = (response.control.status[key].state === 'on')?1:0;
+               }
+           } else {
+               lastvalue = history[history.length-1];
+           }
            for (var i = 0; i <= length; ++i) {
               history.push (lastvalue);
            }
@@ -80,14 +94,21 @@ function relayShowChanges (response) {
            relayLastHistory[key] = history;
         }
         var graph = document.getElementById ('graph-'+key);
-        graph.innerHTML = relayLastHistory[key].join("").replace(/0/g, "&#x23BD").replace(/1/g, "&#x23BA"); // TBD: SVG graph
+        // TBD: SVG graph instead of semi-graphic?
+        graph.innerHTML = relayLastHistory[key].join("").replace(/0/g, "&#x23BD").replace(/1/g, "&#x23BA");
     }
     relayLastTimestamp =
         response.control.changes.start + response.control.changes.end;
 }
 
 function relayChanges () {
-    var url = "/relays/changes" + (relayLastTimestamp?("?since="+relayLastTimestamp):"?sync=1");
+    var url = "/relays/changes";
+    if (relayLastTimestamp) {
+       url += "?since=" + relayLastTimestamp;
+       if (Date.now() % 30 == 0) url += "&sync=1";
+    } else {
+       url += "?sync=1";
+    }
     var command = new XMLHttpRequest();
     command.open("GET", url);
     command.onreadystatechange = function () {
