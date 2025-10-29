@@ -10,7 +10,9 @@ See the [gallery](https://github.com/pascal-fb-martin/houserelays/blob/master/ga
 
 The primary intent is to support a distributed network of relay boards, to avoid pulling electric wires from one side of the home to the other: a small set of relay boards is installed, each board located close to existing wiring or near the equipment to control. Each relay board is attached to a small computer (e.g. Raspberry Pi Zero W). The typical use is to control sprinklers, a garage door, etc. By using such a micro-service architecture, the application may run anywhere in the home and still access all the devices, regardless of their locations.
 
-The secondary intent is to share a relay board between multiple independent applications: sprinkler system, garage door controller, etc. Each application control only those devices that it is configured for.
+The secondary intent is to share a relay board between multiple independent applications: sprinkler system, garage door controller, etc. Each application controls only those devices that it is configured for. A `gear` configuration attribute allows an application to select which points it wants to control.
+
+A third intent is to share access to digital inputs, e.g. reed relay status. Since the overhead of web polling is relatively high and the timing of HTTP requests is not really accurate, this server stores a limited history of input changes, which clients can access at a lower rate. The sampling rate of inputs is typically 100ms and about 6 seconds worth of the most recent changes is kept available. Since these are input points, multiple applications may access them simultanously.
 
 This way relay boards may be installed at convenient points across the home, and be accessed by separate applications independently of the relays or applications physical locations.
 
@@ -64,7 +66,7 @@ If on is 0, the output is configured as open-drain, the on command sets the outp
 
 If on is 1, the output is configured as 3-state, the on command sets the output to 1, and the off command sets the output to 0.
 
-The gear attribute is used by applications to filter which control points to show on their user interface. The typical values are valve (irrigation) and light.
+The `gear` attribute is used by applications to filter which control points to show on their user interface. The typical values are valve (irrigation) and light.
 
 ## Web API
 
@@ -109,7 +111,7 @@ The optional cause parameter is reflected in the event that records the control.
 GET /relays/changes[?since=MILLISECONDS][&sync=0|1]
 ```
 
-Return a JSON array of the recent input state changes. The history is not saved to disk and the server keeps only a fixed number of state changes. The client must request new changes at most every 5 seconds.
+Return a JSON array of the recent input state changes. The history is not saved to disk and the server keeps only a fixed number of state changes, typically 6 seconds worth of history. The client must request new changes at least every 5 seconds or else changes might be lost.
 
 This endpoint returns no data if there is no input point configured. No change history is provided for output points. When clients request for changes, the input points are scanned at a higher speed than the default one second, typically at a 100 milliseconds rate. Since this fast scan only occurs when clients are active, the first request always return no changes, i.e. an empty object: the client must be prepared for this. This fast scan rate stops when no request for changes has been made for some time (typically 12 seconds).
 
@@ -117,7 +119,7 @@ If the `sync` option is present and its value is 1, the response also includes t
 
 A client requesting both changes and status must use the `/relays/changes` endpoint instead of `/relays/status`. The `sync` option may be used at a longer interval than the poll (i.e. the sync option may be set every N requests only).
 
-> This is similar to how the [DNP 3](https://www.dnp.org/) standard's keeps event and static polls synchronized. The main difference is that DNP 3 keeps the `since` context on the server side, i.e. in the outstation, while this design makes the client responsible for maintaining that context (making multi-clients support much simpler).
+> This is similar to how the [DNP 3](https://www.dnp.org/) standard's keeps event and static polls synchronized. The main difference is that DNP 3 keeps the `since` context on the server side, i.e. in the outstation, while the HouseRelay client is responsible for maintaining that context (making multi-clients support much simpler).
 
 This returns data in the JSON format with the following structure:
 
@@ -145,6 +147,18 @@ POST /relays/config
 Upload and activate a new server configuration.
 
 The server is also capable of serving static pages, location in /usr/share/house/public/relays. The URL of each page must start with /relays.
+
+## Testing with simulated GPIO
+
+The Linux kernel supports declaring fake GPIO that can be controlled by test scripts. There are two such GPIO simulators: gpio-mockup and gpio-sim. Both work by declaring an additional GPIO chip. In order to simplify testing with such a simulator without tinkering with the configuration, HouseRelay supports a `--chip=N` command line option that superseeds the `relays.iochip` item in the configuration.
+
+For example, if the gpio-mockup module was loaded and created device `/dev/gpiochip2`, then the following command forces HouseRelay to interface with the gpio-mockup GPIO pins:
+
+```
+houserelays --chip=2
+```
+
+GPIO pins 0 and 1 may not be accessible, as they might be already used depending on the system configuration. Use `gpioinfo` to check the status of the GPIO pins.
 
 ## Debian Packaging
 
