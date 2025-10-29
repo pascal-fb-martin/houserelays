@@ -71,6 +71,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <errno.h>
 #include <gpiod.h>
 
 #include "echttp_hash.h"
@@ -101,6 +102,7 @@ struct RelayMap {
     int gpio;
     int on;
     int off;
+    int failed; // Failure already detected, avoid logging the same error.
 #ifdef USE_GPIOD2
     struct gpiod_line_request *line;
 #else
@@ -263,6 +265,7 @@ const char *houserelays_gpio_refresh (void) {
             Relays[i].line = 0;
             Relays[i].commanded = 0;
             Relays[i].deadline = 0;
+            Relays[i].failed = 0;
 
 #ifdef USE_GPIOD2
             struct gpiod_line_settings *settings = gpiod_line_settings_new();
@@ -300,7 +303,11 @@ endv2init:
 
 #else // GPIOD 1 API
             Relays[i].line = gpiod_chip_get_line (RelayChip, Relays[i].gpio);
-            if (!Relays[i].line) continue;
+            if (!Relays[i].line) {
+                fprintf (stderr, "Cannot get line for %s (gpio %d): %s\n", Relays[i].name, Relays[i].gpio, strerror (errno));
+                Relays[i].failed = 1;
+                continue;
+            }
             if (Relays[i].mode == HOUSE_GPIO_MODE_OUTPUT) {
                 if (Relays[i].on) {
                     gpiod_line_request_output
@@ -309,9 +316,15 @@ endv2init:
                     gpiod_line_request_output_flags
                         (Relays[i].line, Relays[i].name, GPIOD_LINE_REQUEST_FLAG_OPEN_DRAIN, GPIOD_LINE_ACTIVE_STATE_HIGH);
                 }
-                gpiod_line_set_value(Relays[i].line, Relays[i].off);
+                if (gpiod_line_set_value(Relays[i].line, Relays[i].off)) {
+                    fprintf (stderr, "Cannot set initial value for output %s (gpio %d): %s\n", Relays[i].name, Relays[i].gpio, strerror (errno));
+                    Relays[i].failed = 1;
+                }
             } else {
-                gpiod_line_request_input (Relays[i].line, Relays[i].name);
+                if (gpiod_line_request_input (Relays[i].line, Relays[i].name)) {
+                    fprintf (stderr, "Cannot request input %s (gpio %d): %s\n", Relays[i].name, Relays[i].gpio, strerror (errno));
+                    Relays[i].failed = 1;
+                }
                 InputIndex[InputCount++] = i;
             }
 #endif
@@ -341,6 +354,13 @@ int houserelays_gpio_get (int point) {
     int state = gpiod_line_request_get_value (Relays[point].line, Relays[point].gpio);
 #else
     int state = gpiod_line_get_value (Relays[point].line);
+    if (state < 0) {
+        if (!Relays[point].failed)
+            fprintf (stderr, "Cannot get value for %s (gpio %d): %s\n", Relays[point].name, Relays[point].gpio, strerror (errno));
+        Relays[point].failed = 1;
+    } else {
+        Relays[point].failed = 0; // Cleared.
+    }
 #endif
     return (state == Relays[point].on);
 }
@@ -369,8 +389,14 @@ int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
     gpiod_line_request_set_value(Relays[point].line, Relays[point].gpio,
                                  state?Relays[point].on:Relays[point].off);
 #else
-    gpiod_line_set_value(Relays[point].line,
-                         state?Relays[point].on:Relays[point].off);
+    if (gpiod_line_set_value(Relays[point].line,
+                         state?Relays[point].on:Relays[point].off)) {
+       if (!Relays[point].failed)
+           fprintf (stderr, "Cannot set %s (gpio %d): %s\n", Relays[point].name, Relays[point].gpio, strerror(errno));
+       Relays[point].failed = 1;
+    } else {
+       Relays[point].failed = 0; // Cleared.
+    }
 #endif
     if (cause)
         snprintf (comment, sizeof(comment), " (%s)", cause);
