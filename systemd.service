@@ -5,6 +5,7 @@ StartLimitIntervalSec=500
 StartLimitBurst=5
 
 [Service]
+User=house
 Restart=on-failure
 RestartSec=50s
 Environment="HTTPOPTS=" "HOUSEOPTS=" "OTHEROPTS=" "OPTS="
