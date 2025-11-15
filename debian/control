@@ -1,5 +1,5 @@
 Source: houserelays
-Version: 1.6
+Version: 1.7
 Section: Web servers
 Maintainer: Pascal Martin <pascal.fb.martin@gmail.com>
 Priority: optional
@@ -7,7 +7,7 @@ Homepage: https://github.com/pascal-fb-martin/houserelays
 Standard-Version: 4.7.0
 Package: houserelays
 Architecture: {{arch}}
-Depends: houseportal,libgpiod2
+Depends: houseportal (>= 2.9),libgpiod2
 Description: A House service to control and read relay states through GPIO
  HouseRelays is part of the House suite of web services.
  .

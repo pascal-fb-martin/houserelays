@@ -178,9 +178,8 @@ window.onload = function() {
    <title>Relays</title>
 </head>
 <body>
-   <table class="housetopcontainer">
-   <tr><td>
-   <table class="housetop">
+   <header>
+   <table>
    <tr>
    <td><a href="/relays/index.html">Relays</a></td>
    <td><a href="/relays/changes.html">Changes</a></td>
@@ -188,8 +187,8 @@ window.onload = function() {
    <td><span>Config</span></td>
    </tr>
    </table>
-   </td></tr>
-   </table>
+   </header>
+   <section>
    <form name="iolistform">
    <table class="houselargetable iolist">
       <tr>
@@ -207,6 +206,7 @@ window.onload = function() {
       <button class="actionbutton" onclick="addConfig()">Add</button>
       <button class="actionbutton" onclick="saveConfig()">Save</button>
    </div>
+   </section>
 </body>
 </html>
 
