@@ -434,7 +434,8 @@ void houserelays_gpio_status (ParserContext context, int root) {
        int point = echttp_json_add_object (context, root, Relays[i].name);
        if (mode) echttp_json_add_string (context, point, "mode", mode);
        echttp_json_add_string (context, point, "state", status);
-       if (Relays[i].mode == HOUSE_GPIO_MODE_OUTPUT)
+       if ((Relays[i].mode == HOUSE_GPIO_MODE_OUTPUT) &&
+           (strcmp (status, commanded)))
            echttp_json_add_string (context, point, "command", commanded);
        if (Relays[i].deadline) {
            echttp_json_add_integer

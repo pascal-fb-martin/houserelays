@@ -16,8 +16,6 @@ A third intent is to share access to digital inputs, e.g. reed relay status. Sin
 
 This way relay boards may be installed at convenient points across the home, and be accessed by separate applications independently of the relays or applications physical locations.
 
-This program implements the House control web service and API.
-
 ## Installation.
 
 * Install the OpenSSL development package(s).
@@ -32,7 +30,12 @@ This program implements the House control web service and API.
 
 The typical hardware supported by this applications are relay boards controlled through 5V TTL digital pins. These are wired to the digital I/O pins of a Raspberry Pi, Odroid or other small Linux computers. Depending on the model, these board are either controlled using open-drain outputs (active low) or 3-state outputs (active high).
 
-The hardware interface is configured through the file /etc/house/relays.json. A typical exemple of configuration is:
+The hardware interface is configured through the HouseDepot file "<host>/relays.json", or through the local file /etc/house/relays.json if local storage is enabled.
+
+> [!NOTE]
+> The group name is not used for HouseDepot. This is because the relays interface is different for each computer: which configuration to load depends on the name of the computer that this service is running on.
+
+A typical exemple of configuration is:
 
 ```
 {
@@ -44,14 +47,18 @@ The hardware interface is configured through the file /etc/house/relays.json. A 
                 "gpio" : 4,
                 "mode" : "output",
                 "on" : 0,
-                "gear" : "valve"
+                "gear" : "valve",
+                "connection" : 1,
+                "description": "Relay 1"
             },
             {
                 "name" : "relay2",
                 "gpio" : 17,
                 "mode" : "output",
                 "on" : 0,
-                "gear" : "valve"
+                "gear" : "valve",
+                "connection" : 2,
+                "description": "Relay 2"
             }
         ]
     }
@@ -68,83 +75,11 @@ If on is 1, the output is configured as 3-state, the on command sets the output 
 
 The `gear` attribute is used by applications to filter which control points to show on their user interface. The typical values are valve (irrigation) and light.
 
+The connection and description items are informational. The connection item can be used to match the markings on the relays motherboard. The description item can be used to store any useful comment about this point's purpose or special properties.
+
 ## Web API
 
-This program implements the House control web API.
-
-The API supported by this server is designed to be as generic as possible. The goal is to reuse the same API for different classes of hardware in the future. Each relay is accessed by a name, which is independent of the actual wiring between the relay board and the computer.
-
-It is recommended to use for each relay a name that represents the device connected to the relay and is unique across the network. Not only does this make the client independent of which relay is used, but will also allow the clients to discover which servers offer access to the devices they are controlling. (The default configuration provided does not follow this convention because it assumes that no application has been configured yet.)
-
-The basic services included are:
-
-* Send controls (with optional pulse timer).
-* Get the current status of all devices, which also serves as a way to discover the list of devices present on this server.
-* Get a recent history of the controls received.
-* Get the current config.
-* Post a new config.
-
-```
-GET /relays/status
-```
-
-Returns a status JSON object that lists each relay by name. Each relay is itself an object with state, command and gear elements and an optional pulse element. The state and command elements are either on or 1 (active), or else off or 0 (inactive). The pulse element is present if there is a pulse timer active (see below for more information about pulses) and indicates the time until which the current state will be maintained.
-
-This returns data in the JSON format with the following structure:
-
-- host:      Name of the host machine this service runs on.
-- timestamp: Time of the response.
-- control.status:  An object that describes each point (state, command, gear and pulse).
-
-```
-GET /relays/set?point=NAME&state=off|0|on|1[&cause=TEXT]
-GET /relays/set?point=NAME&state=off|0|on|1&pulse=N[&cause=TEXT]
-```
-
-Set the specified relay point to the specified state. If the pulse parameter is present the point is maintained for the specified number of seconds, then reverted (i.e. if state is 1 and pulse if 10, the relay is set active for 10 seconds then changed to inactive after 10 seconds). If the pulse parameter is not present or its value is 0, the specified state is maintained until the next set request is issued.
-
-The point name "all" denotes all points served by this web server. Use with caution as the service maybe shared between multiple applications. It is intended for maintenance only.
-
-The optional cause parameter is reflected in the event that records the control. This is a way to describe what caused the control to be issued, thus the name.
-
-```
-GET /relays/changes[?since=MILLISECONDS][&sync=0|1]
-```
-
-Return a JSON array of the recent input state changes. The history is not saved to disk and the server keeps only a fixed number of state changes, typically 6 seconds worth of history. The client must request new changes at least every 5 seconds or else changes might be lost.
-
-This endpoint returns no data if there is no input point configured. No change history is provided for output points. When clients request for changes, the input points are scanned at a higher speed than the default one second, typically at a 100 milliseconds rate. Since this fast scan only occurs when clients are active, the first request always return no changes, i.e. an empty object: the client must be prepared for this. This fast scan rate stops when no request for changes has been made for some time (typically 12 seconds).
-
-If the `sync` option is present and its value is 1, the response also includes the state of all points (not just input) in the same `control.status` object as returned by `/relays/status`. This option is intended to keep the data from requests for changes and status properly ordered. The client must process the changes data first, then the status data. The changes data represents changes that occurred prior to the current status. Future changes requests will include changes subsequent to that status. This way the client will not process the list of changes out of order compared to status.
-
-A client requesting both changes and status must use the `/relays/changes` endpoint instead of `/relays/status`. The `sync` option may be used at a longer interval than the poll (i.e. the sync option may be set every N requests only).
-
-> This is similar to how the [DNP 3](https://www.dnp.org/) standard's keeps event and static polls synchronized. The main difference is that DNP 3 keeps the `since` context on the server side, i.e. in the outstation, while the HouseRelay client is responsible for maintaining that context (making multi-clients support much simpler).
-
-This returns data in the JSON format with the following structure:
-
-- host:                   Name of the host machine this service runs on.
-- timestamp:              Time of the response.
-- control.changes:        An object that describes the input points that changed, or an empty object when no change history is available.
-- control.changes.start:  Time of the oldest state.
-- control.changes.step:   Interval between two consecutive values.
-- control.sequend.end:    Time of the most recent state (relative to changes.start).
-- control.changes.data:   An object that lists every input point that changed. Each input point is an array of sequential values (i.e. a time series) sampled at `control.changes.step` intervals.
-- control.status:         If sync is requested. See `/relays/status`.
-
-All time values in the control.changes object are in millisecond units.
-
-```
-GET /relays/config
-```
-
-Return a JSON dump of the server's local configuration.
-
-```
-POST /relays/config
-```
-
-Upload and activate a new server configuration.
+This program implements the [House control API](https://github.com/pascal-fb-martin/houseportal/blob/master/controlapi.md), including the sequence of changes extension.
 
 The server is also capable of serving static pages, location in /usr/share/house/public/relays. The URL of each page must start with /relays.
 
