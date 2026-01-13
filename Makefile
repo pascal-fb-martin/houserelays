@@ -29,6 +29,8 @@ INSTALL=/usr/bin/install
 HAPP=houserelays
 HCAT=automation
 
+EXTRADOC=/var/lib/house/note/extra
+
 # Application build. --------------------------------------------
 
 GPIODOPT=$(shell pkg-config --atleast-version=2 libgpiod 2> /dev/null && echo -DUSE_GPIOD2)
@@ -56,6 +58,8 @@ houserelays: $(OBJS)
 install-ui: install-preamble
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHARE)/public/relays
 	$(INSTALL) -m 0644 public/* $(DESTDIR)$(SHARE)/public/relays
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(EXTRADOC)/$(HPKG)/gallery
+	$(INSTALL) -m 0644 gallery/* $(DESTDIR)$(EXTRADOC)/$(HPKG)/gallery
 
 install-runtime: install-preamble
 	$(INSTALL) -m 0755 -s houserelays $(DESTDIR)$(prefix)/bin
