@@ -240,16 +240,15 @@ const char *houserelays_gpio_refresh (void) {
     Relays = calloc(sizeof(struct RelayMap), RelaysCount);
     if (!Relays) return "no more memory";
     if (InputIndex) free(InputIndex);
-    InputIndex = calloc (sizeof(int), RelaysCount);
+    InputIndex = calloc (RelaysCount, sizeof(int));
 
     RelayChip = gpiod_chip_open(path);
     if (!RelayChip) return "cannot access GPIO";
 
+    int *list = calloc (RelaysCount, sizeof(int));
+    houseconfig_enumerate (relays, list, RelaysCount);
     for (i = 0; i < RelaysCount; ++i) {
-        int point;
-        char path[128];
-        snprintf (path, sizeof(path), "[%d]", i);
-        point = houseconfig_object (relays, path);
+        int point = list[i];;
         if (point > 0) {
             Relays[i].name = houseconfig_string (point, ".name");
             Relays[i].gear = houseconfig_string (point, ".gear");
@@ -330,6 +329,8 @@ endv2init:
 #endif
         }
     }
+    free (list);
+
     return 0;
 }
 
