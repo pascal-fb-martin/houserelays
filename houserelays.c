@@ -171,18 +171,17 @@ static const char *relays_config (const char *method, const char *uri,
     if (strcmp ("GET", method) == 0) {
         echttp_content_type_json ();
         return houseconfig_current();
-    } else if (strcmp ("POST", method) == 0) {
-        const char *error = houseconfig_update (data);
+    }
+
+    if (strcmp ("POST", method) == 0) {
+        const char *error = houseconfig_update (data, "USER CHANGE");
         if (error) {
             echttp_error (400, error);
-        } else {
-            houserelays_gpio_refresh ();
-            houselog_event ("SYSTEM", "CONFIG", "SAVE", "TO DEPOT %s", houseconfig_name());
-            housedepositor_put ("config", houseconfig_name(), data, length);
         }
-    } else {
-        echttp_error (400, "invalid state value");
+        return "";
     }
+
+    echttp_error (400, "invalid state value");
     return "";
 }
 
@@ -191,17 +190,11 @@ static void relays_background (int fd, int mode) {
     time_t now = time(0);
 
     houseportal_background (now);
-    houserelays_gpio_periodic(now);
+    houserelays_gpio_periodic (now);
     housediscover (now);
     houselog_background (now);
+    houseconfig_background (now);
     housedepositor_periodic (now);
-}
-
-static void relays_config_listener (const char *name, time_t timestamp,
-                                    const char *data, int length) {
-
-    houselog_event ("SYSTEM", "CONFIG", "LOAD", "FROM DEPOT %s", name);
-    if (!houseconfig_update (data)) houserelays_gpio_refresh ();
 }
 
 static void relays_protect (const char *method, const char *uri) {
@@ -210,6 +203,7 @@ static void relays_protect (const char *method, const char *uri) {
 
 int main (int argc, const char **argv) {
 
+    const char *error;
     char defaultoption[266];
 
     // These strange statements are to make sure that fds 0 to 2 are
@@ -235,8 +229,8 @@ int main (int argc, const char **argv) {
     housedepositor_default (defaultoption);
     housedepositor_initialize (argc, argv);
 
-    houseconfig_default ("--config=relays");
-    const char *error = houseconfig_load (argc, argv);
+    error = houseconfig_initialize
+                ("relays", houserelays_gpio_refresh, argc, argv);
     if (error) {
         houselog_trace
             (HOUSE_FAILURE, "CONFIG", "Cannot load configuration: %s\n", error);
@@ -246,7 +240,6 @@ int main (int argc, const char **argv) {
         houselog_trace
             (HOUSE_FAILURE, "CONFIG", "Cannot configure GPIO: %s\n", error);
     }
-    housedepositor_subscribe ("config", houseconfig_name(), relays_config_listener);
 
     echttp_cors_allow_method("GET");
     echttp_protect (0, relays_protect);
