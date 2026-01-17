@@ -248,7 +248,7 @@ const char *houserelays_gpio_refresh (void) {
     int *list = calloc (RelaysCount, sizeof(int));
     houseconfig_enumerate (relays, list, RelaysCount);
     for (i = 0; i < RelaysCount; ++i) {
-        int point = list[i];;
+        int point = houseconfig_object (list[i], 0);
         if (point > 0) {
             Relays[i].name = houseconfig_string (point, ".name");
             Relays[i].gear = houseconfig_string (point, ".gear");
