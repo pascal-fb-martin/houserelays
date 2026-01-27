@@ -381,9 +381,9 @@ int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
 
     if (echttp_isdebug()) {
         if (pulse)
-            fprintf (stderr, "set %s to %s at %ld (pulse %ds)\n", Relays[point].name, namedstate, now, pulse);
+            fprintf (stderr, "set %s to %s at %lld (pulse %ds)\n", Relays[point].name, namedstate, (long long)now, pulse);
         else
-            fprintf (stderr, "set %s to %s at %ld\n", Relays[point].name, namedstate, now);
+            fprintf (stderr, "set %s to %s at %lld\n", Relays[point].name, namedstate, (long long)now);
     }
 
 #ifdef USE_GPIOD2
