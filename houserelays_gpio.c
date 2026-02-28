@@ -379,9 +379,10 @@ int houserelays_gpio_get (int point) {
     if (point < 0 || point > RelaysCount) return 0;
     if (!Relays[point].line) return 0;
 #ifdef USE_GPIOD2
-    int state = gpiod_line_request_get_value (Relays[point].line, Relays[point].gpio);
+    int iostate = gpiod_line_request_get_value (Relays[point].line, Relays[point].gpio);
 #else
     int iostate = gpiod_line_get_value (Relays[point].line);
+#endif
     if (iostate < 0) {
         if (!Relays[point].failed)
             fprintf (stderr, "Cannot get value for %s (gpio %d): %s\n", Relays[point].name, Relays[point].gpio, strerror (errno));
@@ -389,7 +390,6 @@ int houserelays_gpio_get (int point) {
     } else {
         Relays[point].failed = 0; // Cleared.
     }
-#endif
     int state = (iostate == Relays[point].on);
     if (Relays[point].state != state) {
         Relays[point].state = state;
