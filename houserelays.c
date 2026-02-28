@@ -44,9 +44,12 @@
 static char HostName[256];
 static char JsonBuffer[65537];
 
-
 static const char *relays_status (const char *method, const char *uri,
                                    const char *data, int length) {
+
+    houserelays_gpio_update ();
+    if (houserelays_gpio_same ()) return "";
+
     ParserToken token[1024];
     char pool[65537];
 
@@ -56,6 +59,7 @@ static const char *relays_status (const char *method, const char *uri,
     echttp_json_add_string (context, root, "host", HostName);
     echttp_json_add_string (context, root, "proxy", houseportal_server());
     echttp_json_add_integer (context, root, "timestamp", (long long)time(0));
+    echttp_json_add_integer (context, root, "latest", houserelays_gpio_current());
     int top = echttp_json_add_object (context, root, "control");
 
     int container = echttp_json_add_object (context, top, "status");
@@ -235,6 +239,7 @@ int main (int argc, const char **argv) {
         houselog_trace
             (HOUSE_FAILURE, "CONFIG", "Cannot load configuration: %s\n", error);
     }
+
     error = houserelays_gpio_configure (argc, argv);
     if (error) {
         houselog_trace

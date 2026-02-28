@@ -52,6 +52,11 @@
  *
  *    Return 1 on success, 0 if the point is not known and -1 on error.
  *
+ * void houserelays_gpio_update (void);
+ *
+ *    Force an update of all the GPIO status. This can be done periodically
+ *    and/or before a request for the current status.
+ *
  * void houserelays_gpio_status (ParserContext context, int root);
  *
  *    Populate the context with the list of known points and their values.
@@ -66,6 +71,16 @@
  * void houserelays_gpio_periodic (void);
  *
  *    This function must be called every second. It ends the expired pulses.
+ *
+ * int houserelays_gpio_same (void);
+ *
+ *    Return true if something changed compare to the known state.
+ *    See the HousePortal's housestate.c module for how this works.
+ *
+ * int houserelays_gpio_current (void);
+ *
+ *    Return an identifier of the current state of the GPIO.
+ *    See the HousePortal's housestate.c module for how this works.
  */
 
 #include <string.h>
@@ -78,6 +93,7 @@
 #include "echttp_json.h"
 
 #include "houselog.h"
+#include "housestate.h"
 #include "houseconfig.h"
 
 #include "houserelays.h"
@@ -108,6 +124,7 @@ struct RelayMap {
 #else
     struct gpiod_line *line;
 #endif
+    int state;
     int commanded;
     time_t deadline;
 
@@ -128,6 +145,8 @@ static time_t RelayFastScanEnabled = 0; // Fastscan is on a timer.
 static struct gpiod_chip *RelayChip = 0;
 
 static const char *DebugChip = 0;
+
+static int LiveGpioState = -1;
 
 const char *houserelays_gpio_configure (int argc, const char **argv) {
     int i;
@@ -205,6 +224,8 @@ static void houserelays_gpio_fast (int enabled) {
 
 const char *houserelays_gpio_refresh (void) {
 
+    if (LiveGpioState < 0) LiveGpioState = housestate_declare ("live");
+
     int i;
     for (i = 0; i < RelaysCount; ++i) {
         if (!Relays[i].line) continue;
@@ -248,20 +269,24 @@ const char *houserelays_gpio_refresh (void) {
     int *list = calloc (RelaysCount, sizeof(int));
     houseconfig_enumerate (relays, list, RelaysCount);
     for (i = 0; i < RelaysCount; ++i) {
+        Relays[i].line = 0;
+        Relays[i].signature = 0;
         int point = houseconfig_object (list[i], 0);
         if (point > 0) {
             Relays[i].name = houseconfig_string (point, ".name");
+            if ((!Relays[i].name) || (!Relays[i].name[0])) continue;
             Relays[i].gear = houseconfig_string (point, ".gear");
             Relays[i].mode =
                 houserelays_gpio_to_mode (houseconfig_string (point, ".mode"));
             Relays[i].desc = houseconfig_string (point, ".description");
-            Relays[i].signature = echttp_hash_signature (Relays[i].name);
             Relays[i].gpio = houseconfig_integer (point, ".gpio");
             Relays[i].on  = houseconfig_integer (point, ".on") & 1;
             if (echttp_isdebug()) fprintf (stderr, "found point %s, gpio %d, on %d %s\n", Relays[i].name, Relays[i].gpio, Relays[i].on, Relays[i].desc);
 
+            Relays[i].signature = echttp_hash_signature (Relays[i].name);
             Relays[i].off = 1 - Relays[i].on;
             Relays[i].line = 0;
+            Relays[i].state = 0;
             Relays[i].commanded = 0;
             Relays[i].deadline = 0;
             Relays[i].failed = 0;
@@ -339,6 +364,7 @@ int houserelays_gpio_search (const char *name) {
     unsigned int signature = echttp_hash_signature (name);
     for (i = 0; i < RelaysCount; ++i) {
        if (Relays[i].signature != signature) continue; // Faster than strcmp()
+       if (!Relays[i].name) continue;
        if (!strcmp (name, Relays[i].name)) return i;
     }
     return -1;
@@ -349,13 +375,14 @@ int houserelays_gpio_count (void) {
 }
 
 int houserelays_gpio_get (int point) {
+
     if (point < 0 || point > RelaysCount) return 0;
     if (!Relays[point].line) return 0;
 #ifdef USE_GPIOD2
     int state = gpiod_line_request_get_value (Relays[point].line, Relays[point].gpio);
 #else
-    int state = gpiod_line_get_value (Relays[point].line);
-    if (state < 0) {
+    int iostate = gpiod_line_get_value (Relays[point].line);
+    if (iostate < 0) {
         if (!Relays[point].failed)
             fprintf (stderr, "Cannot get value for %s (gpio %d): %s\n", Relays[point].name, Relays[point].gpio, strerror (errno));
         Relays[point].failed = 1;
@@ -363,7 +390,12 @@ int houserelays_gpio_get (int point) {
         Relays[point].failed = 0; // Cleared.
     }
 #endif
-    return (state == Relays[point].on);
+    int state = (iostate == Relays[point].on);
+    if (Relays[point].state != state) {
+        Relays[point].state = state;
+        housestate_changed (LiveGpioState);
+    }
+    return state;
 }
 
 int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
@@ -417,6 +449,7 @@ int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
                         "LATCHED%s", comment);
     }
     Relays[point].commanded = state;
+    housestate_changed (LiveGpioState);
     return 1;
 }
 
@@ -424,12 +457,19 @@ static int houserelays_gpio_next (int index) {
     return (++index) % HOUSE_GPIO_SEQUENCE_DEPTH;
 }
 
+void houserelays_gpio_update (void) {
+
+    int i;
+    for (i = 0; i < RelaysCount; ++i) houserelays_gpio_get(i);
+}
+
 void houserelays_gpio_status (ParserContext context, int root) {
 
     int i;
     for (i = 0; i < RelaysCount; ++i) {
+       if (!Relays[i].line) continue;
        const char *mode = houserelays_gpio_from_mode(i);
-       const char *status = houserelays_gpio_get(i)?"on":"off";
+       const char *status = Relays[i].state?"on":"off";
        const char *commanded = Relays[i].commanded?"on":"off";
 
        int point = echttp_json_add_object (context, root, Relays[i].name);
@@ -516,12 +556,20 @@ void houserelays_gpio_changes (long long since,
 
 void houserelays_gpio_periodic (time_t now) {
 
+    static time_t LastUpdate = 0;
+
     int i;
     for (i = 0; i < RelaysCount; ++i) {
+        if (!Relays[i].line) continue;
         if (Relays[i].mode != HOUSE_GPIO_MODE_OUTPUT) continue;
         if (Relays[i].deadline > 0 && now >= Relays[i].deadline) {
             houserelays_gpio_set (i, 1 - Relays[i].commanded, -1, 0);
         }
+    }
+
+    if (now != LastUpdate) {
+       houserelays_gpio_update ();
+       LastUpdate = now;
     }
 
     if (RelayFastScanEnabled) {
@@ -532,5 +580,13 @@ void houserelays_gpio_periodic (time_t now) {
 
         if (now > deadline) houserelays_gpio_fast (0);
     }
+}
+
+int houserelays_gpio_same (void) {
+    return housestate_same (LiveGpioState);
+}
+
+int houserelays_gpio_current (void) {
+    return housestate_current (LiveGpioState);
 }
 
