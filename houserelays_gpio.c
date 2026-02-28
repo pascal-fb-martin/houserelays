@@ -301,11 +301,29 @@ const char *houserelays_gpio_refresh (void) {
             if (Relays[i].mode == HOUSE_GPIO_MODE_OUTPUT) {
                 gpiod_line_settings_set_direction (settings, GPIOD_LINE_DIRECTION_OUTPUT);
                 gpiod_line_settings_set_output_value (settings, Relays[i].off);
-                gpiod_line_settings_set_drive (settings,
-                        Relays[i].on?GPIOD_LINE_DRIVE_PUSH_PULL:GPIOD_LINE_DRIVE_OPEN_DRAIN);
+                if (Relays[i].on) {
+                    gpiod_line_settings_set_drive
+                        (settings, GPIOD_LINE_DRIVE_PUSH_PULL);
+                    gpiod_line_settings_set_bias
+                        (settings, GPIOD_LINE_BIAS_DISABLED);
+                } else {
+                    gpiod_line_settings_set_drive
+                        (settings, GPIOD_LINE_DRIVE_OPEN_DRAIN);
+                    gpiod_line_settings_set_bias
+                        (settings, GPIOD_LINE_BIAS_PULL_UP);
+                }
             } else {
-                gpiod_line_settings_set_direction (settings, GPIOD_LINE_DIRECTION_INPUT);
-                gpiod_line_settings_set_edge_detection (settings, GPIOD_LINE_EDGE_NONE);
+                gpiod_line_settings_set_direction
+                        (settings, GPIOD_LINE_DIRECTION_INPUT);
+                gpiod_line_settings_set_edge_detection
+                        (settings, GPIOD_LINE_EDGE_NONE);
+                if (Relays[i].on) {
+                    gpiod_line_settings_set_bias
+                        (settings, GPIOD_LINE_BIAS_DISABLED);
+                } else {
+                    gpiod_line_settings_set_bias
+                        (settings, GPIOD_LINE_BIAS_PULL_UP);
+                }
                 InputIndex[InputCount++] = i;
             }
 
