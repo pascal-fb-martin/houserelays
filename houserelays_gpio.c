@@ -81,6 +81,17 @@
  *
  *    Return an identifier of the current state of the GPIO.
  *    See the HousePortal's housestate.c module for how this works.
+ *
+ * KNOWN ISSUES
+ *
+ *    This module creates one line request per point. This is because point
+ *    settings (input/output, open drain, etc.) are defined individually.
+ *    Since there is a limited number of settings possible (four combinations:
+ *    push/pull input, open drain input, push/pull output, open drain output),
+ *    it should be possible to group all points into a single request.
+ *
+ *    The benefit would be to read the current state of all points in 1 to 4
+ *    calls (typically 1 or 2), instead of one call per point.
  */
 
 #include <string.h>

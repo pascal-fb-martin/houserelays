@@ -69,11 +69,11 @@ The iochip item must match the Linux gpiod chip index. The gpio item must match 
 
 The mode can be `input` or `output`. If the item is missing, the mode defaults to `output`. All control requests that target an input point are ignored.
 
-If on is 0, the output is configured as open-drain, the on command sets the output to 0, and the off command sets the output to 1.
+If on is 0, the point is configured as open-drain with pull-up enabled, the on command sets the output to 0, and the off command sets the output to 1.
 
-If on is 1, the output is configured as 3-state, the on command sets the output to 1, and the off command sets the output to 0.
+If on is 1, an output point is configured as push-pull, the on command sets the output to 1, and the off command sets the output to 0.
 
-The `gear` attribute is used by applications to filter which control points to show on their user interface. The typical values are valve (irrigation) and light.
+The `gear` attribute can be used by applications to filter which control points to show on their user interface. Typical values are valve (irrigation) and light.
 
 The connection and description items are informational. The connection item can be used to match the markings on the relays motherboard. The description item can be used to store any useful comment about this point's purpose or special properties.
 
