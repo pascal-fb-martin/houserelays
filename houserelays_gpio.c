@@ -116,9 +116,10 @@
 // Keep about 6 seconds worth of history, to allow processing periodic requests
 // up to 5 seconds aparts with some margin.
 //
-#define HOUSE_GPIO_SEQUENCE_PERIOD 100  // Milliseconds.
-#define HOUSE_GPIO_SEQUENCE_DEPTH   64
-#define HOUSE_GPIO_SEQUENCE_SPAN   (HOUSE_GPIO_SEQUENCE_DEPTH * HOUSE_GPIO_SEQUENCE_PERIOD)
+#define HOUSE_GPIO_SEQUENCE_DEFAULT 100  // Milliseconds.
+#define HOUSE_GPIO_SEQUENCE_MIN     10  // Milliseconds.
+#define HOUSE_GPIO_SEQUENCE_DEPTH   640
+#define HOUSE_GPIO_SEQUENCE_SPAN   (HOUSE_GPIO_SEQUENCE_DEPTH * HOUSE_GPIO_SEQUENCE_MIN)
 
 struct RelayMap {
     const char *name;
@@ -148,10 +149,11 @@ static int RelaysCount = 0;
 static int *InputIndex = 0;
 static int InputCount = 0;
 
+static int       RelaySamplingRate = HOUSE_GPIO_SEQUENCE_DEFAULT;
 static long long RelayTimestamps[HOUSE_GPIO_SEQUENCE_DEPTH];
-static int RelayLastScanIndex = 0;
+static int       RelayLastScanIndex = 0;
 static long long RelayLastScanTime = 0;
-static time_t RelayFastScanEnabled = 0; // Fastscan is on a timer.
+static time_t    RelayFastScanEnabled = 0; // Fastscan is on a timer.
 
 static struct gpiod_chip *RelayChip = 0;
 
@@ -161,8 +163,16 @@ static int LiveGpioState = -1;
 
 const char *houserelays_gpio_configure (int argc, const char **argv) {
     int i;
+    const char *value;
     for (i = 1; i < argc; ++i) {
-        echttp_option_match ("-chip=", argv[i], &DebugChip);
+        if (echttp_option_match ("-chip=", argv[i], &DebugChip)) continue;
+        if (echttp_option_match ("-rate=", argv[i], &value)) {
+            RelaySamplingRate = atoi (value);
+            if ((RelaySamplingRate >= 1000) ||
+                (RelaySamplingRate < HOUSE_GPIO_SEQUENCE_MIN))
+                RelaySamplingRate = HOUSE_GPIO_SEQUENCE_DEFAULT;
+            continue;
+        }
     }
     return houserelays_gpio_refresh ();
 }
@@ -191,7 +201,7 @@ static const char *houserelays_gpio_from_mode (int point) {
 }
 
 static int houserelays_gpio_to_sequence (long long timestamp) {
-    return (int) ((timestamp / HOUSE_GPIO_SEQUENCE_PERIOD) % HOUSE_GPIO_SEQUENCE_DEPTH);
+    return (int) ((timestamp / RelaySamplingRate) % HOUSE_GPIO_SEQUENCE_DEPTH);
 }
 
 static void houserelays_gpio_scanner (int fd, int mode) {
@@ -221,8 +231,7 @@ static void houserelays_gpio_fast (int enabled) {
             RelayLastScanIndex = 0;
             RelayLastScanTime = 0;
             memset (RelayTimestamps, 0, sizeof(RelayTimestamps));
-            echttp_fastscan (houserelays_gpio_scanner,
-                             HOUSE_GPIO_SEQUENCE_PERIOD);
+            echttp_fastscan (houserelays_gpio_scanner, RelaySamplingRate);
         }
         RelayFastScanEnabled = time(0);
     } else {
@@ -549,7 +558,7 @@ void houserelays_gpio_changes (long long since,
     }
 
     echttp_json_add_integer (context, root, "start", RelayTimestamps[start]);
-    echttp_json_add_integer (context, root, "step", HOUSE_GPIO_SEQUENCE_PERIOD);
+    echttp_json_add_integer (context, root, "step", RelaySamplingRate);
     echttp_json_add_integer (context, root, "end",
                              RelayTimestamps[end]-RelayTimestamps[start]);
 
@@ -585,8 +594,6 @@ void houserelays_gpio_changes (long long since,
 
 void houserelays_gpio_periodic (time_t now) {
 
-    static time_t LastUpdate = 0;
-
     int i;
     for (i = 0; i < RelaysCount; ++i) {
         if (!Relays[i].line) continue;
@@ -594,11 +601,6 @@ void houserelays_gpio_periodic (time_t now) {
         if (Relays[i].deadline > 0 && now >= Relays[i].deadline) {
             houserelays_gpio_set (i, 1 - Relays[i].commanded, -1, 0);
         }
-    }
-
-    if (now != LastUpdate) {
-       houserelays_gpio_update ();
-       LastUpdate = now;
     }
 
     if (RelayFastScanEnabled) {
