@@ -141,10 +141,10 @@ static const char *relays_changes (const char *method, const char *uri,
     if (syncpar) sync = atoi(syncpar);
     if (sincepar) since = atoll(sincepar);
 
-    ParserToken token[2048];
+    ParserToken token[20480];
     char pool[65537];
 
-    ParserContext context = echttp_json_start (token, 2048, pool, 65537);
+    ParserContext context = echttp_json_start (token, 20480, pool, 65537);
 
     int root = echttp_json_add_object (context, 0, 0);
     echttp_json_add_string (context, root, "host", HostName);
