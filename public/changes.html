@@ -95,7 +95,7 @@ function relayShowChanges (response) {
         }
         var graph = document.getElementById ('graph-'+key);
         // TBD: SVG graph instead of semi-graphic?
-        graph.innerHTML = relayLastHistory[key].join("").replace(/0/g, "&#x23BD").replace(/1/g, "&#x23BA");
+        graph.innerHTML = relayLastHistory[key].join("").replace(/0/g, ".").replace(/1/g, "&#x00B7");
     }
     relayLastTimestamp =
         response.control.changes.start + response.control.changes.end;
