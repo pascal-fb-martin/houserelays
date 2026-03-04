@@ -201,6 +201,7 @@ static const char *houserelays_gpio_from_mode (int point) {
 }
 
 static int houserelays_gpio_to_sequence (long long timestamp) {
+    if (timestamp <= 0) return 0; // Only positive values accepted.
     return (int) ((timestamp / RelaySamplingRate) % HOUSE_GPIO_SEQUENCE_DEPTH);
 }
 
@@ -548,15 +549,19 @@ void houserelays_gpio_changes (long long since,
 
     if (RelayTimestamps[origin] != since) since = 0; // Force full report.
 
-    if (since) {
+    if (since > 0) {
+       // Start from the requested timestamp.
        start = houserelays_gpio_next (origin);
     } else {
+       // Start from the oldest valid record.
        start = end;
        do {
            start = houserelays_gpio_next (start);
-       } while (RelayTimestamps[start] <= since);
+       } while (RelayTimestamps[start] <= 0);
     }
+    if (RelayTimestamps[start] <= 0) return; // Nothing to show.
 
+    echttp_json_add_integer (context, root, "depth", HOUSE_GPIO_SEQUENCE_DEPTH);
     echttp_json_add_integer (context, root, "start", RelayTimestamps[start]);
     echttp_json_add_integer (context, root, "step", RelaySamplingRate);
     echttp_json_add_integer (context, root, "end",
