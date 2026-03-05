@@ -545,7 +545,7 @@ void houserelays_gpio_changes (long long since,
 
     int start;
     int end = RelayLastScanIndex;
-    int origin;
+    int origin = 0;
 
     if (since > 0) {
         origin = houserelays_gpio_to_sequence (since);
