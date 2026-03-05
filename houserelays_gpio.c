@@ -545,9 +545,12 @@ void houserelays_gpio_changes (long long since,
 
     int start;
     int end = RelayLastScanIndex;
-    int origin = houserelays_gpio_to_sequence (since);
+    int origin;
 
-    if (RelayTimestamps[origin] != since) since = 0; // Force full report.
+    if (since > 0) {
+        origin = houserelays_gpio_to_sequence (since);
+        if (RelayTimestamps[origin] != since) since = 0; // Force full report.
+    }
     if (RelayTimestamps[end] <= since) return; // Data is too old to show.
 
     if (since > 0) {
@@ -560,6 +563,7 @@ void houserelays_gpio_changes (long long since,
            start = houserelays_gpio_next (start);
            if (start == end) return; // Break infinite loop.
        } while (RelayTimestamps[start] <= 0);
+       origin = start;
     }
     if (RelayTimestamps[start] <= 0) return; // Nothing to show.
 

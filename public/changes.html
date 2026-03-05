@@ -4,7 +4,8 @@
 <link rel=stylesheet type="text/css" href="/house.css" title="House">
 <script>
 
-var Depth = 640;
+const DepthMax = 256
+var Depth = DepthMax;
 var relayLastTimestamp = 0;
 
 var relayLastHistory = new Array();
@@ -43,8 +44,10 @@ function relayShowInput (points) {
 
 function relayShowChanges (response) {
 
-    if (response.control.changes.depth)
+    if (response.control.changes.depth) {
         Depth = response.control.changes.depth;
+        if (Depth > DepthMax) Depth = DepthMax;
+    }
 
     if (response.control.status) {
         var title = response.host+' - Changes';
@@ -60,7 +63,9 @@ function relayShowChanges (response) {
     for (const [key, value] of Object.entries(points)) {
         var history;
         present[key] = true;
-        if (relayLastHistory[key]) {
+        if (value.length > Depth) {
+           history = value.slice (value.length-Depth);
+        } else if (relayLastHistory[key]) {
             history = relayLastHistory[key].concat (value);
             if (history.length > Depth) {
                history = history.slice (history.length-Depth);
