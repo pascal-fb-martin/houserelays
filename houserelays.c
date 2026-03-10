@@ -157,13 +157,10 @@ static const char *relays_changes (const char *method, const char *uri,
     echttp_json_add_integer (context, root, "timestamp", (long long)time(0));
     int top = echttp_json_add_object (context, root, "control");
 
-    int container = echttp_json_add_object (context, top, "changes");
-    houserelays_gpio_changes (since, context, container);
-
     houserelays_memory_changes (since, context, top);
 
     if (sync) {
-        container = echttp_json_add_object (context, top, "status");
+        int container = echttp_json_add_object (context, top, "status");
         houserelays_gpio_status (context, container);
     }
 

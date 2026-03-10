@@ -126,10 +126,9 @@
 // Keep about 6 seconds worth of history, to allow processing periodic requests
 // up to 5 seconds aparts with some margin.
 //
-#define HOUSE_GPIO_SEQUENCE_DEFAULT 100  // Milliseconds.
-#define HOUSE_GPIO_SEQUENCE_MIN     10   // Milliseconds.
-#define HOUSE_GPIO_SEQUENCE_DEPTH   640
-#define HOUSE_GPIO_SEQUENCE_SPAN   (HOUSE_GPIO_SEQUENCE_DEPTH * HOUSE_GPIO_SEQUENCE_MIN)
+#define HOUSE_GPIO_RATE_DEFAULT 100  // Milliseconds.
+#define HOUSE_GPIO_RATE_MIN     10   // Milliseconds.
+#define HOUSE_GPIO_SCAN_TIMEOUT 15   // Seconds.
 
 struct RelayMap {
     const char *name;
@@ -151,7 +150,6 @@ struct RelayMap {
     time_t deadline;
 
     int history; // Index of this input point in the history.
-    char sequence[HOUSE_GPIO_SEQUENCE_DEPTH];
 };
 
 static struct RelayMap *Relays = 0;
@@ -160,10 +158,7 @@ static int RelaysCount = 0;
 static int *InputIndex = 0;
 static int InputCount = 0;
 
-static int       RelaySamplingRate = HOUSE_GPIO_SEQUENCE_DEFAULT;
-static long long RelayTimestamps[HOUSE_GPIO_SEQUENCE_DEPTH];
-static int       RelayLastScanIndex = 0;
-static long long RelayLastScanTime = 0;
+static int       RelaySamplingRate = HOUSE_GPIO_RATE_DEFAULT;
 static time_t    RelayFastScanEnabled = 0; // Fastscan is on a timer.
 
 static struct gpiod_chip *RelayChip = 0;
@@ -173,7 +168,7 @@ static const char *DebugChip = 0;
 static int LiveGpioState = -1;
 
 static void houserelays_gpio_setrate (int rate) {
-    if ((rate < 1000) && (rate >= HOUSE_GPIO_SEQUENCE_MIN))
+    if ((rate < 1000) && (rate >= HOUSE_GPIO_RATE_MIN))
         RelaySamplingRate = rate;
 }
 
@@ -213,33 +208,22 @@ static const char *houserelays_gpio_from_mode (int point) {
     return 0;
 }
 
-static int houserelays_gpio_to_sequence (long long timestamp) {
-    if (timestamp <= 0) return 0; // Only positive values accepted.
-    return (int) ((timestamp / RelaySamplingRate) % HOUSE_GPIO_SEQUENCE_DEPTH);
-}
-
 static void houserelays_gpio_scanner (int fd, int mode) {
 
     struct timeval now;
     gettimeofday (&now, 0);
 
     long long timestamp = (1000LL * now.tv_sec) + now.tv_usec / 1000;
-    int index = houserelays_gpio_to_sequence (timestamp);
 
     int i;
     for (i = 0; i < InputCount; ++i) {
         int point = InputIndex[i];
         int old = Relays[point].state;
         int new = houserelays_gpio_get (point);
-        Relays[point].sequence[index] = (char) new;
         if (old != new)
             houserelays_memory_store (timestamp, Relays[point].history, new);
     }
     houserelays_memory_done (timestamp);
-
-    RelayTimestamps[index] = timestamp;
-    RelayLastScanIndex = index;
-    RelayLastScanTime = timestamp;
 }
 
 void houserelays_gpio_fast (int rate) {
@@ -247,11 +231,14 @@ void houserelays_gpio_fast (int rate) {
     if (InputCount <= 0) return; // Nothing to enable anyway.
 
     if (!RelayFastScanEnabled) { // Protection against self reset.
-        RelayLastScanIndex = 0;
-        RelayLastScanTime = 0;
-        memset (RelayTimestamps, 0, sizeof(RelayTimestamps));
         if (rate) houserelays_gpio_setrate (rate);
         echttp_fastscan (houserelays_gpio_scanner, RelaySamplingRate);
+        houserelays_memory_reset (InputCount, RelaySamplingRate);
+        int i;
+        for (i = 0; i < InputCount; ++i) {
+            int point = InputIndex[i];
+            Relays[point].history = houserelays_memory_add (Relays[point].name);
+        }
     }
     RelayFastScanEnabled = time(0); // Keep fast scanning for now.
 }
@@ -259,8 +246,6 @@ void houserelays_gpio_fast (int rate) {
 static void houserelays_gpio_slow (void) {
     if (RelayFastScanEnabled) {
         echttp_fastscan (0, 0);
-        RelayLastScanIndex = 0;
-        RelayLastScanTime = 0;
         RelayFastScanEnabled = 0;
     }
 }
@@ -305,8 +290,6 @@ const char *houserelays_gpio_refresh (void) {
     if (!Relays) return "no more memory";
     if (InputIndex) free(InputIndex);
     InputIndex = calloc (RelaysCount, sizeof(int));
-
-    houserelays_memory_reset (RelaysCount, RelaySamplingRate);
 
     RelayChip = gpiod_chip_open(path);
     if (!RelayChip) return "cannot access GPIO";
@@ -414,11 +397,13 @@ endv2init:
             }
 #endif
             if (Relays[i].mode != HOUSE_GPIO_MODE_OUTPUT) {
-                Relays[i].history = houserelays_memory_add (Relays[i].name);
                 InputIndex[InputCount++] = i;
             }
         }
     }
+
+    // The list of controls changed: remove all references to the old names.
+    houserelays_memory_reset (InputCount, RelaySamplingRate);
     free (list);
 
     return 0;
@@ -518,10 +503,6 @@ int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
     return 1;
 }
 
-static int houserelays_gpio_next (int index) {
-    return (++index) % HOUSE_GPIO_SEQUENCE_DEPTH;
-}
-
 void houserelays_gpio_update (void) {
 
     int i;
@@ -563,74 +544,6 @@ void houserelays_gpio_status (ParserContext context, int root) {
     }
 }
 
-void houserelays_gpio_changes (long long since,
-                               ParserContext context, int root) {
-
-    if (RelayLastScanTime <= since) {
-       // (If there are no input points, then RelayLastScanTime remains at 0.)
-       return; // No data (or no data yet).
-    }
-
-    int start;
-    int end = RelayLastScanIndex;
-    int origin = 0;
-
-    if (since > 0) {
-        origin = houserelays_gpio_to_sequence (since);
-        if (RelayTimestamps[origin] != since) since = 0; // Force full report.
-    }
-    if (RelayTimestamps[end] <= since) return; // Data is too old to show.
-
-    if (since > 0) {
-       // Start from the requested timestamp.
-       start = houserelays_gpio_next (origin);
-    } else {
-       // Start from the oldest valid record.
-       start = end;
-       do {
-           start = houserelays_gpio_next (start);
-           if (start == end) return; // Break infinite loop.
-       } while (RelayTimestamps[start] <= 0);
-       origin = start;
-    }
-    if (RelayTimestamps[start] <= 0) return; // Nothing to show.
-
-    echttp_json_add_integer (context, root, "depth", HOUSE_GPIO_SEQUENCE_DEPTH);
-    echttp_json_add_integer (context, root, "start", RelayTimestamps[start]);
-    echttp_json_add_integer (context, root, "step", RelaySamplingRate);
-    echttp_json_add_integer (context, root, "end",
-                             RelayTimestamps[end]-RelayTimestamps[start]);
-
-    int top = echttp_json_add_object (context, root, "data");
-    int i;
-    for (i = 0; i < InputCount; ++i) {
-       int point = InputIndex[i];
-       if (since) {
-           int haschanged = 0;
-           int j = start;
-           int reference = Relays[point].sequence[origin];
-           while (1) {
-               if (Relays[point].sequence[j] != reference) {
-                  haschanged = 1;
-                  break;
-               }
-               if (j == end) break;
-               j = houserelays_gpio_next (j);
-           }
-           if (!haschanged) continue; // Skip this point (no change).
-       }
-
-       int array = echttp_json_add_array (context, top, Relays[point].name);
-       int j = start;
-       while (1) {
-           echttp_json_add_integer
-               (context, array, 0, Relays[point].sequence[j]);
-           if (j == end) break;
-           j = houserelays_gpio_next (j);
-       }
-    }
-}
-
 void houserelays_gpio_periodic (time_t now) {
 
     int i;
@@ -645,8 +558,7 @@ void houserelays_gpio_periodic (time_t now) {
     if (RelayFastScanEnabled) {
         // If there was no changes request for much more than the stored
         // history, disable fast scan: there is no active client anymore.
-        time_t deadline = RelayFastScanEnabled +
-                             ((2 * HOUSE_GPIO_SEQUENCE_SPAN) / 1000);
+        time_t deadline = RelayFastScanEnabled + HOUSE_GPIO_SCAN_TIMEOUT;
 
         if (now > deadline) houserelays_gpio_slow ();
     }
