@@ -168,11 +168,16 @@ void houserelays_memory_changes (long long since,
 
     // List all the changes that occurred after "since"
     int top = echttp_json_add_array (context, root, "data");
+    int adjust = 1; // Adjust the first delay.
     for (; i != MemoryNext; i = houserelays_memory_next (i)) {
         int change = echttp_json_add_array (context, top, 0);
         int value = (MemoryStore[i].point & 0x80000000)?1:0;
         int index = MemoryStore[i].point & 0x7fffffff;
-        long long adjusted = MemoryStore[i].delay + (start - since);
+        long long adjusted = MemoryStore[i].delay;
+        if (adjust) {
+           adjusted += (start - since);
+           adjust = 0;
+        }
         echttp_json_add_integer (context, change, 0, adjusted);
         echttp_json_add_integer (context, change, 0, index);
         echttp_json_add_integer (context, change, 0, value);
