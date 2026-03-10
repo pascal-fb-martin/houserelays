@@ -137,12 +137,15 @@ static const char *relays_changes (const char *method, const char *uri,
 
     const char *syncpar = echttp_parameter_get("sync");
     const char *sincepar = echttp_parameter_get("since");
+    const char *ratepar = echttp_parameter_get("rate");
     int sync = 0;
     long long since = 0;
     if (syncpar) sync = atoi(syncpar);
     if (sincepar) since = atoll(sincepar);
 
-    houserelays_gpio_fast ();
+    int rate = 0;
+    if (ratepar) rate = atoi (ratepar);
+    houserelays_gpio_fast (rate);
 
     ParserToken token[20480];
     char pool[65537];

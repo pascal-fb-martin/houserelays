@@ -36,7 +36,7 @@ void houserelays_gpio_update (void);
 int  houserelays_gpio_same (void);
 int  houserelays_gpio_current (void);
 
-void houserelays_gpio_fast (void);
+void houserelays_gpio_fast (int rate);
 
 void houserelays_gpio_status (ParserContext context, int root);
 void houserelays_gpio_changes (long long since,

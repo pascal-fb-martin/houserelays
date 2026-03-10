@@ -61,11 +61,14 @@
  *
  *    Populate the context with the list of known points and their values.
  *
- * void houserelays_gpio_fast (void);
+ * void houserelays_gpio_fast (int rate);
  *
- *    Enable fast scanning for a few seconds. This should be called
- *    periodically to maintain fast scanning active. This is typically
- *    called when the client asks for the change history.
+ *    Enable fast scanning for a few seconds. The rate is in millisecond
+ *    and must be in the 10 to 999 range. Otherwise a rate of 0 means
+ *    keep using the existing sampling rate.
+ *
+ *    This should be called periodically to maintain fast scanning active.
+ *    This is typically called when the client asks for the change history.
  *
  * void houserelays_gpio_changes (long long since,
  *                                ParserContext context, int root);
@@ -124,7 +127,7 @@
 // up to 5 seconds aparts with some margin.
 //
 #define HOUSE_GPIO_SEQUENCE_DEFAULT 100  // Milliseconds.
-#define HOUSE_GPIO_SEQUENCE_MIN     10  // Milliseconds.
+#define HOUSE_GPIO_SEQUENCE_MIN     10   // Milliseconds.
 #define HOUSE_GPIO_SEQUENCE_DEPTH   640
 #define HOUSE_GPIO_SEQUENCE_SPAN   (HOUSE_GPIO_SEQUENCE_DEPTH * HOUSE_GPIO_SEQUENCE_MIN)
 
@@ -169,16 +172,18 @@ static const char *DebugChip = 0;
 
 static int LiveGpioState = -1;
 
+static void houserelays_gpio_setrate (int rate) {
+    if ((rate < 1000) && (rate >= HOUSE_GPIO_SEQUENCE_MIN))
+        RelaySamplingRate = rate;
+}
+
 const char *houserelays_gpio_configure (int argc, const char **argv) {
     int i;
     const char *value;
     for (i = 1; i < argc; ++i) {
         if (echttp_option_match ("-chip=", argv[i], &DebugChip)) continue;
         if (echttp_option_match ("-rate=", argv[i], &value)) {
-            RelaySamplingRate = atoi (value);
-            if ((RelaySamplingRate >= 1000) ||
-                (RelaySamplingRate < HOUSE_GPIO_SEQUENCE_MIN))
-                RelaySamplingRate = HOUSE_GPIO_SEQUENCE_DEFAULT;
+            houserelays_gpio_setrate (atoi (value));
             continue;
         }
     }
@@ -237,7 +242,7 @@ static void houserelays_gpio_scanner (int fd, int mode) {
     RelayLastScanTime = timestamp;
 }
 
-void houserelays_gpio_fast (void) {
+void houserelays_gpio_fast (int rate) {
 
     if (InputCount <= 0) return; // Nothing to enable anyway.
 
@@ -245,6 +250,7 @@ void houserelays_gpio_fast (void) {
         RelayLastScanIndex = 0;
         RelayLastScanTime = 0;
         memset (RelayTimestamps, 0, sizeof(RelayTimestamps));
+        if (rate) houserelays_gpio_setrate (rate);
         echttp_fastscan (houserelays_gpio_scanner, RelaySamplingRate);
     }
     RelayFastScanEnabled = time(0); // Keep fast scanning for now.
