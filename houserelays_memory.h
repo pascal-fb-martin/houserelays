@@ -17,30 +17,13 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA  02110-1301, USA.
  *
- *
- * houserelays_gpio.c - Access a GPIO mapped relay board.
- *
+ * houserelays_memory.h - A mechanism to record GPIO changes of state.
  */
-const char *houserelays_gpio_configure (int argc, const char **argv);
-const char *houserelays_gpio_refresh (void);
-
-int houserelays_gpio_search (const char *name);
-int houserelays_gpio_count (void);
-
-const char *houserelays_gpio_failure (int point);
-
-int houserelays_gpio_get (int point);
-int houserelays_gpio_set (int point, int state, int pulse, const char *cause);
-
-void houserelays_gpio_update (void);
-int  houserelays_gpio_same (void);
-int  houserelays_gpio_current (void);
-
-void houserelays_gpio_fast (void);
-
-void houserelays_gpio_status (ParserContext context, int root);
-void houserelays_gpio_changes (long long since,
-                               ParserContext context, int root);
-
-void houserelays_gpio_periodic (time_t now);
+void houserelays_memory_reset (int count, int rate);
+int  houserelays_memory_add (const char *name);
+void houserelays_memory_store (long long timestamp, int index, int state);
+void houserelays_memory_done  (long long timestamp);
+void houserelays_memory_changes (long long since,
+                                 ParserContext context, int root);
+void houserelays_memory_background (time_t now);
 

@@ -61,6 +61,12 @@
  *
  *    Populate the context with the list of known points and their values.
  *
+ * void houserelays_gpio_fast (void);
+ *
+ *    Enable fast scanning for a few seconds. This should be called
+ *    periodically to maintain fast scanning active. This is typically
+ *    called when the client asks for the change history.
+ *
  * void houserelays_gpio_changes (long long since,
  *                                ParserContext context, int root);
  *
@@ -109,6 +115,7 @@
 
 #include "houserelays.h"
 #include "houserelays_gpio.h"
+#include "houserelays_memory.h"
 
 #define HOUSE_GPIO_MODE_INPUT  1
 #define HOUSE_GPIO_MODE_OUTPUT 2
@@ -140,6 +147,7 @@ struct RelayMap {
     int commanded;
     time_t deadline;
 
+    int history; // Index of this input point in the history.
     char sequence[HOUSE_GPIO_SEQUENCE_DEPTH];
 };
 
@@ -216,26 +224,34 @@ static void houserelays_gpio_scanner (int fd, int mode) {
     int i;
     for (i = 0; i < InputCount; ++i) {
         int point = InputIndex[i];
-        Relays[point].sequence[index] = (char) houserelays_gpio_get (point);
+        int old = Relays[point].state;
+        int new = houserelays_gpio_get (point);
+        Relays[point].sequence[index] = (char) new;
+        if (old != new)
+            houserelays_memory_store (timestamp, Relays[point].history, new);
     }
+    houserelays_memory_done (timestamp);
+
     RelayTimestamps[index] = timestamp;
     RelayLastScanIndex = index;
     RelayLastScanTime = timestamp;
 }
 
-static void houserelays_gpio_fast (int enabled) {
+void houserelays_gpio_fast (void) {
 
-    if (InputCount <= 0) enabled = 0; // Nothing to enable anyway.
+    if (InputCount <= 0) return; // Nothing to enable anyway.
 
-    if (enabled) {
-        if (!RelayFastScanEnabled) { // Protection against self reset.
-            RelayLastScanIndex = 0;
-            RelayLastScanTime = 0;
-            memset (RelayTimestamps, 0, sizeof(RelayTimestamps));
-            echttp_fastscan (houserelays_gpio_scanner, RelaySamplingRate);
-        }
-        RelayFastScanEnabled = time(0);
-    } else {
+    if (!RelayFastScanEnabled) { // Protection against self reset.
+        RelayLastScanIndex = 0;
+        RelayLastScanTime = 0;
+        memset (RelayTimestamps, 0, sizeof(RelayTimestamps));
+        echttp_fastscan (houserelays_gpio_scanner, RelaySamplingRate);
+    }
+    RelayFastScanEnabled = time(0); // Keep fast scanning for now.
+}
+
+static void houserelays_gpio_slow (void) {
+    if (RelayFastScanEnabled) {
         echttp_fastscan (0, 0);
         RelayLastScanIndex = 0;
         RelayLastScanTime = 0;
@@ -261,7 +277,7 @@ const char *houserelays_gpio_refresh (void) {
     if (RelayChip) gpiod_chip_close (RelayChip);
 
     InputCount = 0;
-    houserelays_gpio_fast (0); // Will be enabled later, on demand.
+    houserelays_gpio_slow (); // Will scan fast only on demand.
 
     char path[127];
     if (DebugChip) {
@@ -283,6 +299,8 @@ const char *houserelays_gpio_refresh (void) {
     if (!Relays) return "no more memory";
     if (InputIndex) free(InputIndex);
     InputIndex = calloc (RelaysCount, sizeof(int));
+
+    houserelays_memory_reset (RelaysCount, RelaySamplingRate);
 
     RelayChip = gpiod_chip_open(path);
     if (!RelayChip) return "cannot access GPIO";
@@ -345,7 +363,6 @@ const char *houserelays_gpio_refresh (void) {
                     gpiod_line_settings_set_bias
                         (settings, GPIOD_LINE_BIAS_PULL_UP);
                 }
-                InputIndex[InputCount++] = i;
             }
 
             const unsigned iopin = Relays[i].gpio;
@@ -388,9 +405,12 @@ endv2init:
                     fprintf (stderr, "Cannot request input %s (gpio %d): %s\n", Relays[i].name, Relays[i].gpio, strerror (errno));
                     Relays[i].failed = 1;
                 }
-                InputIndex[InputCount++] = i;
             }
 #endif
+            if (Relays[i].mode != HOUSE_GPIO_MODE_OUTPUT) {
+                Relays[i].history = houserelays_memory_add (Relays[i].name);
+                InputIndex[InputCount++] = i;
+            }
         }
     }
     free (list);
@@ -499,7 +519,18 @@ static int houserelays_gpio_next (int index) {
 void houserelays_gpio_update (void) {
 
     int i;
-    for (i = 0; i < RelaysCount; ++i) houserelays_gpio_get(i);
+    if (RelayFastScanEnabled) {
+       // The input are already scanned at a high rate, so only the output
+       // points need to be scanned at this stage.
+       for (i = 0; i < RelaysCount; ++i) {
+           if (Relays[i].mode == HOUSE_GPIO_MODE_OUTPUT) {
+               houserelays_gpio_get(i);
+           }
+       }
+    } else {
+       // Must scan all points now since there is no periodic scan.
+       for (i = 0; i < RelaysCount; ++i) houserelays_gpio_get(i);
+    }
 }
 
 void houserelays_gpio_status (ParserContext context, int root) {
@@ -531,17 +562,8 @@ void houserelays_gpio_changes (long long since,
 
     if (RelayLastScanTime <= since) {
        // (If there are no input points, then RelayLastScanTime remains at 0.)
-       if (InputCount <= 0) return;
-
-       // If there are input points but fastscan was not enabled, it is
-       // time to activate it.
-       if (!RelayFastScanEnabled) houserelays_gpio_fast (1);
-
        return; // No data (or no data yet).
     }
-
-    // Fast scan is on and an active client is asking for the data: renew.
-    RelayFastScanEnabled = time(0);
 
     int start;
     int end = RelayLastScanIndex;
@@ -620,7 +642,7 @@ void houserelays_gpio_periodic (time_t now) {
         time_t deadline = RelayFastScanEnabled +
                              ((2 * HOUSE_GPIO_SEQUENCE_SPAN) / 1000);
 
-        if (now > deadline) houserelays_gpio_fast (0);
+        if (now > deadline) houserelays_gpio_slow ();
     }
 }
 

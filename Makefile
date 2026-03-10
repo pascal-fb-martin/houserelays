@@ -35,7 +35,7 @@ EXTRADOC=/var/lib/house/note/extra
 
 GPIODOPT=$(shell pkg-config --atleast-version=2 libgpiod 2> /dev/null && echo -DUSE_GPIOD2)
 
-OBJS= houserelays.o houserelays_gpio.o
+OBJS= houserelays.o houserelays_gpio.o houserelays_memory.o
 LIBOJS=
 
 all: houserelays

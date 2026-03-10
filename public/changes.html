@@ -9,6 +9,7 @@ var Depth = DepthMax;
 var relayLastTimestamp = 0;
 
 var relayLastHistory = new Array();
+var relayLastHistory2 = new Array();
 
 function relayShowInput (points) {
 
@@ -39,6 +40,38 @@ function relayShowInput (points) {
     // Purge input points that have disappeared.
     for (const [key, value] of Object.entries(relayLastHistory)) {
         if (!present[key]) delete relayLastHistory[key];
+    }
+}
+
+function relayShowInput2 (points) {
+
+    var table = document.getElementById ('pointlist2');
+    for (var i = table.rows.length - 1; i > 0; i--) {
+        table.deleteRow(i);
+    }
+
+    var present = new Array();
+    for (const [key, value] of Object.entries(points).sort()) {
+
+        if (value.mode !== "input") continue;
+        var row = table.insertRow();
+
+        var column = document.createElement("td");
+        column.innerHTML = key;
+        row.appendChild(column);
+
+        var column = document.createElement("td");
+        column.id = 'graph2-'+key;
+        row.appendChild(column);
+
+        present[key] = true;
+        if (!relayLastHistory2[key]) { // New point.
+           relayLastHistory2[key] = new Array();
+        }
+    }
+    // Purge input points that have disappeared.
+    for (const [key, value] of Object.entries(relayLastHistory)) {
+        if (!present[key]) delete relayLastHistory2[key];
     }
 }
 
@@ -82,6 +115,7 @@ function relayShowChanges (response) {
     // response.control.status structure.
     //
     var length = response.control.changes.end / response.control.changes.step;
+    length = Math.floor (length);
     for (const [key, value] of Object.entries(relayLastHistory)) {
         if (!present[key]) {
            var history = relayLastHistory[key];
@@ -109,6 +143,103 @@ function relayShowChanges (response) {
         response.control.changes.start + response.control.changes.end;
 }
 
+function relayShowChanges2 (response) {
+
+    if (response.control.status) {
+        var title = response.host+' - Changes';
+        document.getElementsByTagName ('title')[0].innerHTML = title;
+        relayShowInput2 (response.control.status);
+    }
+
+    if (!response.control.history) return;
+
+    var step = response.control.history.step;
+    var end = response.control.history.start + response.control.history.end;
+    var updlen = response.control.history.end / step;
+    updlen = Math.floor (updlen);
+
+    var cursor = 0;
+    var points = response.control.history.data;
+    if (!points) points = Array(0);
+    var names = response.control.history.names;
+
+    // Update the local history of the input points.
+    for (var i = 0; i < points.length; ++i) {
+        var history;
+        var change = points[i];
+        var delta = Math.floor (change[0] / step);
+        var index = change[1];
+
+        // This might be a second change simultanous to a previous one.
+        if (delta <= 0) {
+            var key = names[index];
+            if (relayLastHistory2[key]) {
+               var history = relayLastHistory2[key];
+               history[history.length-1] = change[2];
+               relayLastHistory2[key] = history;
+            }
+           continue;
+        }
+
+        // No change occurred during that delta time,
+        // except for the specified point.
+        cursor += delta;
+        for (var j = 0; j < names.length; ++j) {
+            var key = names[j];
+
+            // Retrieve the last known state.
+            var laststate = 0;
+            if (relayLastHistory2[key]) {
+                var lasthistory = relayLastHistory2[key];
+                laststate = lasthistory[lasthistory.length-1];
+            }
+            // Build the sequence of states until that change.
+            var update;
+            if (j == index) {
+               update = Array(delta-1).fill(laststate);
+               update.push (change[2]);
+            } else {
+               update = Array(delta).fill(laststate);
+            }
+            // Append this update to the point's history.
+            if (relayLastHistory2[key]) {
+               history = relayLastHistory2[key].concat (update);
+            } else {
+               history = update;
+            }
+            if (history.length > Depth) {
+               history = history.slice (history.length-Depth);
+            }
+            relayLastHistory2[key] = history;
+        }
+    }
+
+    // Fill the remaining time between the last change and the end of
+    // the covered period.
+    if (cursor < updlen) {
+        var postamble = updlen - cursor;
+        for (var j = 0; j < names.length; ++j) {
+            var key = names[j];
+            var lasthistory = relayLastHistory2[key];
+            laststate = lasthistory[lasthistory.length-1];
+            var update = update = Array(postamble).fill(laststate);
+            history = relayLastHistory2[key].concat (update);
+            if (history.length > Depth) {
+                history = history.slice (history.length-Depth);
+            }
+            relayLastHistory2[key] = history;
+        }
+    }
+
+    // Show the new, updated history.
+    //
+    for (const [key, value] of Object.entries(relayLastHistory)) {
+        var graph = document.getElementById ('graph2-'+key);
+        // TBD: SVG graph instead of semi-graphic?
+        graph.innerHTML = value.join("").replace(/0/g, ".").replace(/1/g, "&#x00B7");
+    }
+}
+
 function relayChanges () {
     var url = "/relays/changes";
     if (relayLastTimestamp) {
@@ -121,7 +252,9 @@ function relayChanges () {
     command.open("GET", url);
     command.onreadystatechange = function () {
         if (command.readyState === 4 && command.status === 200) {
-            relayShowChanges (JSON.parse(command.responseText));
+            response = JSON.parse(command.responseText);
+            relayShowChanges (response);
+            relayShowChanges2 (response);
         }
     }
     command.send(null);
@@ -148,12 +281,24 @@ window.onload = function() {
    </table>
    </header>
    <section>
+   <section>
+   <h1>Old changes format</h1>
    <table id="pointlist" class="housewidetable iolist" border="0">
       <tr>
          <th width="10%">NAME</th>
          <th width="90%">DATA</th>
       </tr>
    </table>
+   </section>
+   <section>
+   <h1>New changes format</h1>
+   <table id="pointlist2" class="housewidetable iolist" border="0">
+      <tr>
+         <th width="10%">NAME</th>
+         <th width="90%">DATA</th>
+      </tr>
+   </table>
+   </section>
    </section>
 </body>
 </html>

@@ -40,6 +40,7 @@
 
 #include "houserelays.h"
 #include "houserelays_gpio.h"
+#include "houserelays_memory.h"
 
 static char HostName[256];
 static char JsonBuffer[65537];
@@ -141,6 +142,8 @@ static const char *relays_changes (const char *method, const char *uri,
     if (syncpar) sync = atoi(syncpar);
     if (sincepar) since = atoll(sincepar);
 
+    houserelays_gpio_fast ();
+
     ParserToken token[20480];
     char pool[65537];
 
@@ -153,6 +156,8 @@ static const char *relays_changes (const char *method, const char *uri,
 
     int container = echttp_json_add_object (context, top, "changes");
     houserelays_gpio_changes (since, context, container);
+
+    houserelays_memory_changes (since, context, top);
 
     if (sync) {
         container = echttp_json_add_object (context, top, "status");
@@ -199,6 +204,7 @@ static void relays_background (int fd, int mode) {
     houselog_background (now);
     houseconfig_background (now);
     housedepositor_periodic (now);
+    houserelays_memory_background (now);
 }
 
 static void relays_protect (const char *method, const char *uri) {
