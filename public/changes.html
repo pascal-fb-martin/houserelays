@@ -9,6 +9,7 @@ var Depth = DepthMax;
 var relayLastTimestamp = 0;
 
 var relayLastHistory = new Array();
+var relayLastState = new Array();
 
 function relayShowInput (points) {
 
@@ -34,6 +35,11 @@ function relayShowInput (points) {
         present[key] = true;
         if (!relayLastHistory[key]) { // New point.
            relayLastHistory[key] = new Array();
+        }
+        if (!relayLastTimestamp) {
+           // Set the initial value.
+           if (value.state === 'off') relayLastState[key] = 0;
+           else relayLastState[key] = 1;
         }
     }
     // Purge input points that have disappeared.
@@ -65,51 +71,46 @@ function relayShowChanges (response) {
         response.control.history.start + response.control.history.end;
 
     var cursor = 0;
-    var points = response.control.history.data;
-    if (!points) points = Array(0);
+    var changes = response.control.history.data;
+    if (!changes) changes = Array(0);
     var names = response.control.history.names;
 
     // Update the local history of the input points.
-    for (var i = 0; i < points.length; ++i) {
+    for (var i = 0; i < changes.length; ++i) {
         var history;
-        var change = points[i];
+        var change = changes[i];
         var delta = Math.floor (change[0] / step);
         var index = change[1];
+        var changekey = names[index];
 
         // This might be a second change simultanous to a previous one.
         if (delta <= 0) {
-            var key = names[index];
-            if (relayLastHistory[key]) {
-               var history = relayLastHistory[key];
+            if (relayLastHistory[changekey]) {
+               var history = relayLastHistory[changekey];
                history[history.length-1] = change[2];
-               relayLastHistory[key] = history;
+               relayLastHistory[changekey] = history;
             }
-           continue;
+            relayLastState[changekey] = change[2];
+            continue;
         }
 
-        // No change occurred during that delta time,
-        // except for the specified point.
+        // No change occurred during that delta time, except for
+        // the specified point.
         cursor += delta;
         for (var j = 0; j < names.length; ++j) {
             var key = names[j];
 
-            // Retrieve the last known state.
-            var laststate = 0;
-            if (relayLastHistory[key]) {
-                var lasthistory = relayLastHistory[key];
-                if (lasthistory.length > 0)
-                    laststate = lasthistory[lasthistory.length-1];
-            }
             // Build the sequence of states until that change.
             var update;
             if (j == index) {
-               update = Array(delta-1).fill(laststate);
+               update = Array(delta-1).fill(relayLastState[key]);
                update.push (change[2]);
             } else {
-               update = Array(delta).fill(laststate);
+               update = Array(delta).fill(relayLastState[key]);
             }
+
             // Append this update to the point's history.
-            if (relayLastHistory[key]) {
+            if (relayLastHistory[key] && (relayLastHistory[key].length > 0)) {
                history = relayLastHistory[key].concat (update);
             } else {
                history = update;
@@ -119,6 +120,7 @@ function relayShowChanges (response) {
             }
             relayLastHistory[key] = history;
         }
+        relayLastState[changekey] = change[2];
     }
 
     // Fill the remaining time between the last change and the end of
@@ -127,9 +129,7 @@ function relayShowChanges (response) {
         var postamble = updlen - cursor;
         for (var j = 0; j < names.length; ++j) {
             var key = names[j];
-            var lasthistory = relayLastHistory[key];
-            laststate = lasthistory[lasthistory.length-1];
-            var update = update = Array(postamble).fill(laststate);
+            var update = Array(postamble).fill(relayLastState[key]);
             history = relayLastHistory[key].concat (update);
             if (history.length > Depth) {
                 history = history.slice (history.length-Depth);
@@ -145,9 +145,18 @@ function relayShowChanges (response) {
         // TBD: SVG graph instead of semi-graphic?
         graph.innerHTML = value.join("").replace(/0/g, ".").replace(/1/g, "&#x00B7");
     }
+
+    if (response.control.status) {
+        // Update the last known states, if ever a change was lost.
+        for (const [key, value] of Object.entries(response.control.status)) {
+           if (value.mode !== "input") continue;
+           if (value.state === 'off') relayLastState[key] = 0;
+           else relayLastState[key] = 1;
+        }
+    }
 }
 
-function relayChanges () {
+function relayUrl () {
     var url = "/relays/changes";
     if (relayLastTimestamp) {
        url += "?since=" + relayLastTimestamp;
@@ -155,8 +164,12 @@ function relayChanges () {
     } else {
        url += "?sync=1";
     }
+    return url;
+}
+
+function relayChanges () {
     var command = new XMLHttpRequest();
-    command.open("GET", url);
+    command.open("GET", relayUrl());
     command.onreadystatechange = function () {
         if (command.readyState === 4 && command.status === 200) {
             response = JSON.parse(command.responseText);

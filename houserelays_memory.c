@@ -150,15 +150,6 @@ void houserelays_memory_done (long long timestamp) {
 void houserelays_memory_changes (long long since,
                                  ParserContext context, int root) {
 
-    if (MemoryNewestTimestamp <= since) return; // No new data.
-
-    int i;
-    long long start = MemoryOldestTimestamp;
-    for (i = MemoryOldest; i != MemoryNext; i = houserelays_memory_next (i)) {
-        long long changetime = start + MemoryStore[i].delay;
-        if (changetime > since) break; // That change is more recent.
-        start = changetime;
-    }
     if (since == 0) since = MemoryOldestTimestamp;
 
     root = echttp_json_add_object (context, root, "history");
@@ -166,9 +157,27 @@ void houserelays_memory_changes (long long since,
     echttp_json_add_integer (context, root, "step", MemorySamplingRate);
     echttp_json_add_integer (context, root, "end", MemoryScanTimestamp-since);
 
+    // Attach the list of points, to interpret the index values provided
+    // in the history below.
+    int top = echttp_json_add_array (context, root, "names");
+    int i;
+    for (i = 0; i < MemoryDictionaryCount; ++i) {
+        echttp_json_add_string (context, top, 0, MemoryDictionary[i]);
+    }
+
     // List all the changes that occurred after "since"
-    int top = echttp_json_add_array (context, root, "data");
+
+    if (MemoryNewestTimestamp <= since) return; // No new data.
+
+    long long start = MemoryOldestTimestamp;
+    for (i = MemoryOldest; i != MemoryNext; i = houserelays_memory_next (i)) {
+        long long changetime = start + MemoryStore[i].delay;
+        if (changetime > since) break; // That change is more recent.
+        start = changetime;
+    }
+
     int adjust = 1; // Adjust the first delay.
+    top = echttp_json_add_array (context, root, "data");
     for (; i != MemoryNext; i = houserelays_memory_next (i)) {
         int change = echttp_json_add_array (context, top, 0);
         int value = (MemoryStore[i].point & 0x80000000)?1:0;
@@ -181,12 +190,6 @@ void houserelays_memory_changes (long long since,
         echttp_json_add_integer (context, change, 0, adjusted);
         echttp_json_add_integer (context, change, 0, index);
         echttp_json_add_integer (context, change, 0, value);
-    }
-
-    // Attach the list of points, to interpret the index values above.
-    top = echttp_json_add_array (context, root, "names");
-    for (i = 0; i < MemoryDictionaryCount; ++i) {
-        echttp_json_add_string (context, top, 0, MemoryDictionary[i]);
     }
 }
 
