@@ -7,6 +7,8 @@
 const DepthMax = 256
 var Depth = DepthMax;
 var relayLastTimestamp = 0;
+var relayTrigger = 'none'; // 'none', 'armed', 'run' or 'end'.
+var relayRefreshCountDown = 0;
 
 var relayLastHistory = new Array();
 var relayLastState = new Array();
@@ -48,7 +50,28 @@ function relayShowInput (points) {
     }
 }
 
+function relayUpdate (response) {
+    if (response.control.status) {
+        // Update the last known states, if a change was lost or not processed.
+        for (const [key, value] of Object.entries(response.control.status)) {
+           if (value.mode !== "input") continue;
+           if (value.state === 'off') relayLastState[key] = 0;
+           else relayLastState[key] = 1;
+        }
+    }
+}
+
 function relayShowChanges (response) {
+
+    if (relayTrigger === 'end') {
+        // Do not show any update anymore, but keep a tab on the data.
+        relayUpdate (response);
+        if (response.control.history) {
+            relayLastTimestamp =
+                response.control.history.start + response.control.history.end;
+        }
+        return;
+    }
 
     if (response.control.status) {
         var title = response.host+' - Changes';
@@ -58,14 +81,15 @@ function relayShowChanges (response) {
 
     if (!response.control.history) return;
 
-    if (response.control.history.depth) {
-        Depth = response.control.history.depth;
-        if (Depth > DepthMax) Depth = DepthMax;
+    if (relayTrigger === 'none') {
+        if (response.control.history.depth) {
+            Depth = response.control.history.depth;
+            if (Depth > DepthMax) Depth = DepthMax;
+        }
     }
 
     var step = response.control.history.step;
-    var updlen = response.control.history.end / step;
-    updlen = Math.floor (updlen);
+    var updlen = Math.floor (response.control.history.end / step);
 
     relayLastTimestamp =
         response.control.history.start + response.control.history.end;
@@ -75,7 +99,20 @@ function relayShowChanges (response) {
     if (!changes) changes = Array(0);
     var names = response.control.history.names;
 
+    if (relayTrigger === 'armed') {
+        if (changes.length <= 0) return;
+        relayTriggerSet ('run');
+        // Align the display on the first detected change.
+        var change = changes[0];
+        var delta = Math.floor (change[0] / step) - 1;
+        if (delta > 1) {
+            updlen -= delta;
+            change[0] = step;
+        }
+    }
+
     // Update the local history of the input points.
+    var endreached = false;
     for (var i = 0; i < changes.length; ++i) {
         var history;
         var change = changes[i];
@@ -116,7 +153,12 @@ function relayShowChanges (response) {
                history = update;
             }
             if (history.length > Depth) {
-               history = history.slice (history.length-Depth);
+               if (relayTrigger === 'run') {
+                  history = history.slice (0, Depth);
+                  endreached = true;
+               } else {
+                  history = history.slice (history.length-Depth);
+               }
             }
             relayLastHistory[key] = history;
         }
@@ -125,17 +167,27 @@ function relayShowChanges (response) {
 
     // Fill the remaining time between the last change and the end of
     // the covered period.
-    if (cursor < updlen) {
-        var postamble = updlen - cursor;
+    var postamble = Math.floor(updlen - cursor);
+    if (postamble > Depth) postamble = Depth;
+    if (postamble > 0) {
         for (var j = 0; j < names.length; ++j) {
             var key = names[j];
             var update = Array(postamble).fill(relayLastState[key]);
             history = relayLastHistory[key].concat (update);
             if (history.length > Depth) {
-                history = history.slice (history.length-Depth);
+               if (relayTrigger === 'run') {
+                  history = history.slice (0, Depth);
+                  endreached = true;
+               } else {
+                  history = history.slice (history.length-Depth);
+               }
             }
             relayLastHistory[key] = history;
         }
+    }
+
+    if (endreached) {
+        relayTriggerSet ('end');
     }
 
     // Show the new, updated history.
@@ -146,23 +198,22 @@ function relayShowChanges (response) {
         graph.innerHTML = value.join("").replace(/0/g, ".").replace(/1/g, "&#x00B7");
     }
 
-    if (response.control.status) {
-        // Update the last known states, if ever a change was lost.
-        for (const [key, value] of Object.entries(response.control.status)) {
-           if (value.mode !== "input") continue;
-           if (value.state === 'off') relayLastState[key] = 0;
-           else relayLastState[key] = 1;
-        }
-    }
+    relayUpdate (response)
 }
 
 function relayUrl () {
     var url = "/relays/changes";
     if (relayLastTimestamp) {
        url += "?since=" + relayLastTimestamp;
-       if (Date.now() % 30 == 0) url += "&sync=1";
+       if (relayRefreshCountDown <= 0) {
+          url += "&sync=1";
+          relayRefreshCountDown = 60;
+       } else {
+          relayRefreshCountDown -= 1;
+       }
     } else {
        url += "?sync=1";
+       relayRefreshCountDown = 60;
     }
     return url;
 }
@@ -179,10 +230,38 @@ function relayChanges () {
     command.send(null);
 }
 
+function relayReset () {
+   relayRefreshCountDown = 0;
+   relayLastHistory = new Array();
+   relayChanges();
+}
+
+function relayTriggerSet (value) {
+   relayTrigger = value;
+   document.getElementById ('triggerstate').innerHTML = value;
+}
+
+function relayTriggerAction () {
+   if (this.checked) {
+      relayTriggerSet ('armed');
+      Depth = document.getElementById ('depth').valueAsNumber;
+   } else {
+      relayTriggerSet ('none');
+      Depth = DepthMax;
+      relayLastTimestamp = 0; // Retrieve as much history as we can.
+   }
+   relayReset ();
+}
+
 window.onload = function() {
 
    relayChanges();
    setInterval (relayChanges, 500);
+
+   document.getElementById ('depth').value = Depth;
+   var trigger = document.getElementById ('trigger');
+   trigger.addEventListener('change', relayTriggerAction);
+   trigger.checked = false;
 };
 </script>
 <head>
@@ -200,12 +279,20 @@ window.onload = function() {
    </table>
    </header>
    <section>
+   <div>
+   <div class="housetitle"><center>
+      <input type="checkbox" id="trigger" name="trigger">
+      <label for="trigger">Trigger</label>
+      then record <input type="number" size="4" id="depth"> samples.
+      (<em id="triggerstate">none</em>)
+   </center></div>
    <table id="pointlist" class="housewidetable iolist" border="0">
       <tr>
          <th width="10%">NAME</th>
          <th width="90%">DATA</th>
       </tr>
    </table>
+   </div>
    </section>
 </body>
 </html>
