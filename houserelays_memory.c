@@ -50,7 +50,7 @@
  *    This must be called at the end of a scan, to set the end of the period
  *    that the current changes cover.
  *
- * void houserelays_memory_changes (long long since,
+ * void houserelays_memory_history (long long since,
  *                                  ParserContext context, int root);
  *
  *    Populate the context with an history of the input changes that occurred
@@ -147,12 +147,11 @@ void houserelays_memory_done (long long timestamp) {
     MemoryScanTimestamp = timestamp;
 }
 
-void houserelays_memory_changes (long long since,
+void houserelays_memory_history (long long since,
                                  ParserContext context, int root) {
 
     if (since == 0) since = MemoryOldestTimestamp;
 
-    root = echttp_json_add_object (context, root, "history");
     echttp_json_add_integer (context, root, "start", since);
     echttp_json_add_integer (context, root, "step", MemorySamplingRate);
     echttp_json_add_integer (context, root, "end", MemoryScanTimestamp-since);

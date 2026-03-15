@@ -61,11 +61,11 @@
  *
  *    Populate the context with the list of known points and their values.
  *
- * void houserelays_gpio_fast (int rate);
+ * void houserelays_gpio_fast (int period);
  *
- *    Enable fast scanning for a few seconds. The rate is in millisecond
- *    and must be in the 10 to 999 range. Otherwise a rate of 0 means
- *    keep using the existing sampling rate.
+ *    Enable fast scanning for a few seconds. The period is in millisecond
+ *    and must be in the 10 to 999 range. Otherwise a period of 0 means
+ *    keep using the existing sampling period.
  *
  *    This should be called periodically to maintain fast scanning active.
  *    This is typically called when the client asks for the change history.
@@ -126,8 +126,8 @@
 // Keep about 6 seconds worth of history, to allow processing periodic requests
 // up to 5 seconds aparts with some margin.
 //
-#define HOUSE_GPIO_RATE_DEFAULT 100  // Milliseconds.
-#define HOUSE_GPIO_RATE_MIN     10   // Milliseconds.
+#define HOUSE_GPIO_PERIOD_DEFAULT 100  // Milliseconds.
+#define HOUSE_GPIO_PERIOD_MIN     10   // Milliseconds.
 #define HOUSE_GPIO_SCAN_TIMEOUT 15   // Seconds.
 
 struct RelayMap {
@@ -158,7 +158,7 @@ static int RelaysCount = 0;
 static int *InputIndex = 0;
 static int InputCount = 0;
 
-static int       RelaySamplingRate = HOUSE_GPIO_RATE_DEFAULT;
+static int       RelaySamplingPeriod = HOUSE_GPIO_PERIOD_DEFAULT;
 static time_t    RelayFastScanEnabled = 0; // Fastscan is on a timer.
 
 static struct gpiod_chip *RelayChip = 0;
@@ -167,9 +167,9 @@ static const char *DebugChip = 0;
 
 static int LiveGpioState = -1;
 
-static void houserelays_gpio_setrate (int rate) {
-    if ((rate < 1000) && (rate >= HOUSE_GPIO_RATE_MIN))
-        RelaySamplingRate = rate;
+static void houserelays_gpio_setperiod (int period) {
+    if ((period < 1000) && (period >= HOUSE_GPIO_PERIOD_MIN))
+        RelaySamplingPeriod = period;
 }
 
 const char *houserelays_gpio_configure (int argc, const char **argv) {
@@ -177,8 +177,8 @@ const char *houserelays_gpio_configure (int argc, const char **argv) {
     const char *value;
     for (i = 1; i < argc; ++i) {
         if (echttp_option_match ("-chip=", argv[i], &DebugChip)) continue;
-        if (echttp_option_match ("-rate=", argv[i], &value)) {
-            houserelays_gpio_setrate (atoi (value));
+        if (echttp_option_match ("-period=", argv[i], &value)) {
+            houserelays_gpio_setperiod (atoi (value));
             continue;
         }
     }
@@ -226,14 +226,27 @@ static void houserelays_gpio_scanner (int fd, int mode) {
     houserelays_memory_done (timestamp);
 }
 
-void houserelays_gpio_fast (int rate) {
+void houserelays_gpio_fast (int period) {
 
     if (InputCount <= 0) return; // Nothing to enable anyway.
 
+    if (period && RelayFastScanEnabled) {
+        // If an explicit sampling period is requested while already
+        // scanning, only accept smaller periods (faster). This is
+        // because there could be multiple clients and we must adjust
+        // for the fastest sampling speed requested.
+        //
+        int old = RelaySamplingPeriod;
+        if (period < old) houserelays_gpio_setperiod (period);
+        period = 0; // We are done with updating the period.
+
+        // If the period has changed, reset the memory storage.
+        if (old != RelaySamplingPeriod) RelayFastScanEnabled = 0;
+    }
     if (!RelayFastScanEnabled) { // Protection against self reset.
-        if (rate) houserelays_gpio_setrate (rate);
-        echttp_fastscan (houserelays_gpio_scanner, RelaySamplingRate);
-        houserelays_memory_reset (InputCount, RelaySamplingRate);
+        if (period) houserelays_gpio_setperiod (period);
+        echttp_fastscan (houserelays_gpio_scanner, RelaySamplingPeriod);
+        houserelays_memory_reset (InputCount, RelaySamplingPeriod);
         int i;
         for (i = 0; i < InputCount; ++i) {
             int point = InputIndex[i];
@@ -403,7 +416,7 @@ endv2init:
     }
 
     // The list of controls changed: remove all references to the old names.
-    houserelays_memory_reset (InputCount, RelaySamplingRate);
+    houserelays_memory_reset (InputCount, RelaySamplingPeriod);
     free (list);
 
     return 0;

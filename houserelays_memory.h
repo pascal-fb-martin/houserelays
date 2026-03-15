@@ -23,7 +23,7 @@ void houserelays_memory_reset (int count, int rate);
 int  houserelays_memory_add (const char *name);
 void houserelays_memory_store (long long timestamp, int index, int state);
 void houserelays_memory_done  (long long timestamp);
-void houserelays_memory_changes (long long since,
+void houserelays_memory_history (long long since,
                                  ParserContext context, int root);
 void houserelays_memory_background (time_t now);
 

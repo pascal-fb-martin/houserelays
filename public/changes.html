@@ -202,7 +202,7 @@ function relayShowChanges (response) {
 }
 
 function relayUrl () {
-    var url = "/relays/changes";
+    var url = "/relays/history";
     if (relayLastTimestamp) {
        url += "?since=" + relayLastTimestamp;
        if (relayRefreshCountDown <= 0) {
@@ -215,6 +215,7 @@ function relayUrl () {
        url += "?sync=1";
        relayRefreshCountDown = 60;
     }
+    url += '&period=' +  document.getElementById ('period').valueAsNumber;
     return url;
 }
 
@@ -280,12 +281,14 @@ window.onload = function() {
    </header>
    <section>
    <div>
-   <div class="housetitle"><center>
+   <div class="housetitle"><table> <tr><td width="50%">
+      Sampling period: <input type="number" size="4" value="100" id="period">
+      </td><td width="50%">
       <input type="checkbox" id="trigger" name="trigger">
       <label for="trigger">Trigger</label>
       then record <input type="number" size="4" id="depth"> samples.
       (<em id="triggerstate">none</em>)
-   </center></div>
+   </td></tr></table></div>
    <table id="pointlist" class="housewidetable iolist" border="0">
       <tr>
          <th width="10%">NAME</th>

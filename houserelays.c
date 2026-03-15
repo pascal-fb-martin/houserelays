@@ -63,6 +63,8 @@ static const char *relays_status (const char *method, const char *uri,
     echttp_json_add_integer (context, root, "latest", houserelays_gpio_current());
     int top = echttp_json_add_object (context, root, "control");
 
+    echttp_json_add_bool (context, top, "history", 1);
+
     int container = echttp_json_add_object (context, top, "status");
     houserelays_gpio_status (context, container);
 
@@ -132,20 +134,20 @@ static const char *relays_set (const char *method, const char *uri,
     return relays_status (method, uri, data, length);
 }
 
-static const char *relays_changes (const char *method, const char *uri,
+static const char *relays_history (const char *method, const char *uri,
                                    const char *data, int length) {
 
     const char *syncpar = echttp_parameter_get("sync");
     const char *sincepar = echttp_parameter_get("since");
-    const char *ratepar = echttp_parameter_get("rate");
+    const char *periodpar = echttp_parameter_get("period");
     int sync = 0;
     long long since = 0;
     if (syncpar) sync = atoi(syncpar);
     if (sincepar) since = atoll(sincepar);
 
-    int rate = 0;
-    if (ratepar) rate = atoi (ratepar);
-    houserelays_gpio_fast (rate);
+    int period = 0;
+    if (periodpar) period = atoi (periodpar);
+    houserelays_gpio_fast (period);
 
     ParserToken token[20480];
     char pool[65537];
@@ -157,10 +159,11 @@ static const char *relays_changes (const char *method, const char *uri,
     echttp_json_add_integer (context, root, "timestamp", (long long)time(0));
     int top = echttp_json_add_object (context, root, "control");
 
-    houserelays_memory_changes (since, context, top);
+    int container = echttp_json_add_object (context, top, "history");
+    houserelays_memory_history (since, context, container);
 
     if (sync) {
-        int container = echttp_json_add_object (context, top, "status");
+        container = echttp_json_add_object (context, top, "status");
         houserelays_gpio_status (context, container);
     }
 
@@ -257,7 +260,7 @@ int main (int argc, const char **argv) {
 
     echttp_route_uri ("/relays/status",  relays_status);
     echttp_route_uri ("/relays/set",     relays_set);
-    echttp_route_uri ("/relays/changes", relays_changes);
+    echttp_route_uri ("/relays/history", relays_history);
 
     echttp_route_uri ("/relays/config", relays_config);
 
