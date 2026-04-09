@@ -208,22 +208,30 @@ static const char *houserelays_gpio_from_mode (int point) {
     return 0;
 }
 
-static void houserelays_gpio_scanner (int fd, int mode) {
+static long long houserelays_gpio_timestamp (void) {
 
     struct timeval now;
     gettimeofday (&now, 0);
+    return (1000LL * now.tv_sec) + now.tv_usec / 1000;
+}
 
-    long long timestamp = (1000LL * now.tv_sec) + now.tv_usec / 1000;
+static void houserelays_gpio_scanner (int fd, int mode) {
+
+    long long timestamp = houserelays_gpio_timestamp ();
 
     int i;
+    int changed = 0;
     for (i = 0; i < InputCount; ++i) {
         int point = InputIndex[i];
-        int old = Relays[point].state;
         int new = houserelays_gpio_get (point);
-        if (old != new)
+        if (new != Relays[point].state) {
             houserelays_memory_store (timestamp, Relays[point].history, new);
+            Relays[point].state = new;
+            changed = 1;
+        }
     }
     houserelays_memory_done (timestamp);
+    if (changed) housestate_changed (LiveGpioState);
 }
 
 void houserelays_gpio_fast (int period) {
@@ -453,11 +461,18 @@ int houserelays_gpio_get (int point) {
     } else {
         Relays[point].failed = 0; // Cleared.
     }
+    long long timestamp = 0;
     int state = (iostate == Relays[point].on);
     if (Relays[point].state != state) {
+        if (RelayFastScanEnabled &&
+            (Relays[point].mode == HOUSE_GPIO_MODE_INPUT)) {
+            timestamp = houserelays_gpio_timestamp ();
+            houserelays_memory_store (timestamp, Relays[point].history, state);
+        }
         Relays[point].state = state;
         housestate_changed (LiveGpioState);
     }
+    if (timestamp) houserelays_memory_done (timestamp);
     return state;
 }
 

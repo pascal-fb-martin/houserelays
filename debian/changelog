@@ -1,3 +1,19 @@
+houserelays (1.8) UNRELEASED; urgency=low
+
+   * Conform to the latest house control API documentation.
+   * Performance improvements.
+   * Manage the depot API in houseconfig.c for more consistent rules between depot and local file storage.
+   * Fix time size mismatch (Linux 64 bit time on 32 bit architecture).
+   * Support poll for changes mechanism.
+   * Fix GPIOD2 regression and use gpiod bias when active low.
+   * Add basic trigger feature to the web UI.
+   * Allow adjusting the sampling rate from the WEB UI and from the client.
+   * New change history design: return list of timed changes.
+   * Keep change history and normal scan consistent.
+   * Switch to libgpiod3.
+
+ -- Pascal Martin <pascal.fb.martin@gmail.com>  Thu, 9 Apr 2026 12:00:00 PDT
+
 houserelays (1.7) UNRELEASED; urgency=low
 
    * Use a more semantic web UI with better layout.
