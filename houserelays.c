@@ -249,7 +249,7 @@ int main (int argc, const char **argv) {
             (HOUSE_FAILURE, "CONFIG", "Cannot load configuration: %s\n", error);
     }
 
-    error = houserelays_gpio_configure (argc, argv);
+    error = houserelays_gpio_initialize (argc, argv);
     if (error) {
         houselog_trace
             (HOUSE_FAILURE, "CONFIG", "Cannot configure GPIO: %s\n", error);

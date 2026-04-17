@@ -21,7 +21,7 @@
  * houserelays_gpio.c - Access a GPIO mapped relay board.
  *
  */
-const char *houserelays_gpio_configure (int argc, const char **argv);
+const char *houserelays_gpio_initialize (int argc, const char **argv);
 const char *houserelays_gpio_refresh (void);
 
 int houserelays_gpio_search (const char *name);

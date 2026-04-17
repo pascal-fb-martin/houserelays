@@ -47,8 +47,8 @@
  *
  * void houserelays_memory_done (long long timestamp);
  *
- *    This must be called at the end of a scan, to set the end of the period
- *    that the current changes cover.
+ *    This must be called at the end of a scan, even if no change was detected,
+ *    to set the end of the period that the current changes cover.
  *
  * void houserelays_memory_history (long long since,
  *                                  ParserContext context, int root);
