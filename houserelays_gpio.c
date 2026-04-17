@@ -219,9 +219,7 @@ static long long houserelays_gpio_timestamp (void) {
 static int houserelays_gpio_store (int point, int state) {
 
     if (point < 0 || point > RelayCount) return 0;
-
     if (Relays[point].state == state) return 0;
-    if (!Relays[point].name) return 0;
 
     DEBUG ("Point %s has new state %d\n", Relays[point].name, state);
     Relays[point].state = state;
@@ -412,7 +410,7 @@ const char *houserelays_gpio_refresh (void) {
         DEBUG ("found point %s, gpio %d, on %d %s\n", Relays[count].name, Relays[count].gpio, Relays[count].on, Relays[count].desc);
         count += 1;
     }
-    DEBUG ("Ignoring %d points\n", RelayCount-count);
+    DEBUG ("Ignoring %d invalid points\n", RelayCount-count);
     RelayCount = count; // Adjust the count to include valid entries only.
 
     // Now that the points configuration was retrieved,
@@ -507,7 +505,6 @@ int houserelays_gpio_search (const char *name) {
     unsigned int signature = echttp_hash_signature (name);
     for (i = 0; i < RelayCount; ++i) {
        if (Relays[i].signature != signature) continue; // Faster than strcmp()
-       if (!Relays[i].name) continue;
        if (!strcmp (name, Relays[i].name)) return i;
     }
     return -1;
@@ -520,7 +517,6 @@ int houserelays_gpio_count (void) {
 int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
 
     if (point < 0 || point > RelayCount) return 0;
-    if (!Relays[point].name) return 0;
 
     // Silently ignore control requests on points that are not output.
     // This is not considered as an error.
@@ -608,7 +604,6 @@ void houserelays_gpio_status (ParserContext context, int root) {
 
     int i;
     for (i = 0; i < RelayCount; ++i) {
-       if (!Relays[i].name) continue;
        const char *mode = houserelays_gpio_from_mode(i);
        const char *status = Relays[i].state?"on":"off";
        const char *commanded = Relays[i].commanded?"on":"off";
@@ -632,7 +627,6 @@ void houserelays_gpio_periodic (time_t now) {
 
     int i;
     for (i = 0; i < RelayCount; ++i) {
-        if (!Relays[i].name) continue;
         if (Relays[i].mode != HOUSE_GPIO_MODE_OUTPUT) continue;
         if (Relays[i].deadline > 0 && now >= Relays[i].deadline) {
             houserelays_gpio_set (i, 1 - Relays[i].commanded, -1, 0);
