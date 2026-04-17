@@ -33,8 +33,6 @@ EXTRADOC=/var/lib/house/note/extra
 
 # Application build. --------------------------------------------
 
-GPIODOPT=$(shell pkg-config --atleast-version=2 libgpiod 2> /dev/null && echo -DUSE_GPIOD2)
-
 OBJS= houserelays.o houserelays_gpio.o houserelays_memory.o
 LIBOJS=
 
@@ -48,7 +46,7 @@ clean:
 rebuild: clean all
 
 %.o: %.c
-	gcc $(GPIODOPT) -c -Wall -Os -o $@ $<
+	gcc -c -Wall -Os -o $@ $<
 
 houserelays: $(OBJS)
 	gcc -Os -o houserelays $(OBJS) -lhouseportal -lechttp -lssl -lcrypto -lgpiod -lmagic -lrt
