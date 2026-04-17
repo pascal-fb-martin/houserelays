@@ -291,20 +291,15 @@ static void houserelays_gpio_slow (void) {
     }
 }
 
-static int houserelay_gpio_addpoint (struct RelayIo *io,
-                                     int direction, int bias, int point) {
+static void houserelay_gpio_setting (struct RelayIo *io,
+                                     int direction, int bias) {
 
-    if (io->count <= 0) {
-        io->settings = gpiod_line_settings_new();
-        gpiod_line_settings_set_direction (io->settings, direction);
-        gpiod_line_settings_set_bias (io->settings, bias);
-        gpiod_line_settings_set_active_low
-            (io->settings, (bias == GPIOD_LINE_BIAS_PULL_UP));
-        io->offsets = calloc (RelayCount, sizeof(unsigned int));
-    }
-    DEBUG ("adding point at offset %d to %s\n", point, io->name);
-    io->offsets[io->count++] = point;
-    return io->count == 1;
+    io->settings = gpiod_line_settings_new();
+    gpiod_line_settings_set_direction (io->settings, direction);
+    gpiod_line_settings_set_bias (io->settings, bias);
+    gpiod_line_settings_set_active_low
+        (io->settings, (bias == GPIOD_LINE_BIAS_PULL_UP));
+    io->offsets = calloc (RelayCount, sizeof(unsigned int));
 }
 
 static int houserelay_gpio_apply (struct RelayIo *io,
@@ -393,84 +388,82 @@ const char *houserelays_gpio_refresh (void) {
 
     int *list = calloc (RelayCount, sizeof(int));
     houseconfig_enumerate (relays, list, RelayCount);
+    int count = 0;
     for (i = 0; i < RelayCount; ++i) {
-        Relays[i].name = 0;
-        Relays[i].signature = 0;
         int point = houseconfig_object (list[i], 0);
-        if (point > 0) {
-            Relays[i].name = houseconfig_string (point, ".name");
-            if ((!Relays[i].name) || (!Relays[i].name[0])) continue;
-            Relays[i].gear = houseconfig_string (point, ".gear");
-            Relays[i].mode =
-                houserelays_gpio_to_mode (houseconfig_string (point, ".mode"));
-            Relays[i].desc = houseconfig_string (point, ".description");
-            Relays[i].gpio = houseconfig_integer (point, ".gpio");
-            Relays[i].on  = houseconfig_integer (point, ".on") & 1;
-            DEBUG ("found point %s, gpio %d, on %d %s\n", Relays[i].name, Relays[i].gpio, Relays[i].on, Relays[i].desc);
+        if (point <= 0) continue;
+        const char *name = houseconfig_string (point, ".name");
+        if ((!name) || (!name[0])) continue;
 
-            Relays[i].signature = echttp_hash_signature (Relays[i].name);
-            Relays[i].state = 0;
-            Relays[i].commanded = 0;
-            Relays[i].deadline = 0;
-            Relays[i].failed = 0;
+        Relays[count].name = name;
+        Relays[count].gear = houseconfig_string (point, ".gear");
+        Relays[count].mode =
+            houserelays_gpio_to_mode (houseconfig_string (point, ".mode"));
+        Relays[count].desc = houseconfig_string (point, ".description");
+        Relays[count].gpio = houseconfig_integer (point, ".gpio");
+        Relays[count].on  = houseconfig_integer (point, ".on") & 1;
 
-            if (Relays[i].mode == HOUSE_GPIO_MODE_OUTPUT) {
-                OutputOffset[OutputCount] = Relays[i].gpio;
-                OutputIndex[OutputCount++] = i;
-            } else {
-                InputOffset[InputCount] = Relays[i].gpio;
-                InputIndex[InputCount++] = i;
-            }
-        }
+        Relays[count].signature = echttp_hash_signature (Relays[count].name);
+        Relays[count].state = 0;
+        Relays[count].commanded = 0;
+        Relays[count].deadline = 0;
+        Relays[count].failed = 0;
+
+        DEBUG ("found point %s, gpio %d, on %d %s\n", Relays[count].name, Relays[count].gpio, Relays[count].on, Relays[count].desc);
+        count += 1;
     }
+    DEBUG ("Ignoring %d points\n", RelayCount-count);
+    RelayCount = count; // Adjust the count to include valid entries only.
 
     // Now that the points configuration was retrieved,
     // initialize the access to the IO.
     //
-    struct RelayIo inhigh = {"inputs active high", 0, 0, 0};
-    struct RelayIo inlow = {"inputs active low", 0, 0, 0};
     struct RelayIo outhigh = {"outputs active high", 0, 0, 0};
     struct RelayIo outlow = {"outputs active low", 0, 0, 0};
+    struct RelayIo inhigh = {"inputs active high", 0, 0, 0};
+    struct RelayIo inlow = {"inputs active low", 0, 0, 0};
+
+    houserelay_gpio_setting
+        (&outhigh, GPIOD_LINE_DIRECTION_OUTPUT, GPIOD_LINE_BIAS_DISABLED);
+    gpiod_line_settings_set_output_value
+        (outhigh.settings, GPIOD_LINE_VALUE_INACTIVE);
+    gpiod_line_settings_set_drive
+        (outhigh.settings, GPIOD_LINE_DRIVE_PUSH_PULL);
+
+    houserelay_gpio_setting
+        (&outlow, GPIOD_LINE_DIRECTION_OUTPUT, GPIOD_LINE_BIAS_PULL_UP);
+    gpiod_line_settings_set_output_value
+        (outlow.settings, GPIOD_LINE_VALUE_INACTIVE);
+    gpiod_line_settings_set_drive
+        (outlow.settings, GPIOD_LINE_DRIVE_OPEN_DRAIN);
+
+    houserelay_gpio_setting
+        (&inhigh, GPIOD_LINE_DIRECTION_INPUT, GPIOD_LINE_BIAS_DISABLED);
+    gpiod_line_settings_set_edge_detection
+        (inhigh.settings, GPIOD_LINE_EDGE_NONE);
+
+    houserelay_gpio_setting
+        (&inlow, GPIOD_LINE_DIRECTION_INPUT, GPIOD_LINE_BIAS_PULL_UP);
+    gpiod_line_settings_set_edge_detection
+        (inlow.settings, GPIOD_LINE_EDGE_NONE);
 
     for (i = 0; i < RelayCount; ++i) {
-        if (Relays[i].name == 0) continue;
+        int gpio = Relays[i].gpio;
         if (Relays[i].mode == HOUSE_GPIO_MODE_OUTPUT) {
+            OutputOffset[OutputCount] = gpio;
+            OutputIndex[OutputCount++] = i;
             if (Relays[i].on) {
-                if (houserelay_gpio_addpoint (&outhigh,
-                                              GPIOD_LINE_DIRECTION_OUTPUT,
-                                              GPIOD_LINE_BIAS_DISABLED,
-                                              Relays[i].gpio)) {
-                    gpiod_line_settings_set_output_value
-                              (outhigh.settings, GPIOD_LINE_VALUE_INACTIVE);
-                    gpiod_line_settings_set_drive
-                              (outhigh.settings, GPIOD_LINE_DRIVE_PUSH_PULL);
-                }
+                outhigh.offsets[outhigh.count++] = gpio;
             } else {
-                if (houserelay_gpio_addpoint (&outlow,
-                                              GPIOD_LINE_DIRECTION_OUTPUT,
-                                              GPIOD_LINE_BIAS_PULL_UP,
-                                              Relays[i].gpio)) {
-                    gpiod_line_settings_set_output_value
-                              (outlow.settings, GPIOD_LINE_VALUE_INACTIVE);
-                    gpiod_line_settings_set_drive
-                              (outlow.settings, GPIOD_LINE_DRIVE_OPEN_DRAIN);
-                }
+                outlow.offsets[outlow.count++] = gpio;
             }
         } else {
+            InputOffset[InputCount] = gpio;
+            InputIndex[InputCount++] = i;
             if (Relays[i].on) {
-                if (houserelay_gpio_addpoint (&inhigh,
-                                              GPIOD_LINE_DIRECTION_INPUT,
-                                              GPIOD_LINE_BIAS_DISABLED,
-                                              Relays[i].gpio))
-                    gpiod_line_settings_set_edge_detection
-                              (inhigh.settings, GPIOD_LINE_EDGE_NONE);
+                inhigh.offsets[inhigh.count++] = gpio;
             } else {
-                if (houserelay_gpio_addpoint (&inlow,
-                                              GPIOD_LINE_DIRECTION_INPUT,
-                                              GPIOD_LINE_BIAS_PULL_UP,
-                                              Relays[i].gpio))
-                    gpiod_line_settings_set_edge_detection
-                              (inlow.settings, GPIOD_LINE_EDGE_NONE);
+                inlow.offsets[inlow.count++] = gpio;
             }
         }
     }
