@@ -88,7 +88,6 @@ static const char **MemoryDictionary = 0;
 static int          MemoryDictionarySize = 0;
 static int          MemoryDictionaryCount = 0;
 
-static char *MemoryFlags = 0;
 static int   MemorySamplingRate = 0;
 
 void houserelays_memory_reset (int size, int rate) {
@@ -97,9 +96,6 @@ void houserelays_memory_reset (int size, int rate) {
         if (MemoryDictionary) free (MemoryDictionary);
         MemoryDictionary = calloc (size, sizeof (char *));
         MemoryDictionarySize = size;
-
-        if (MemoryFlags) free (MemoryFlags);
-        MemoryFlags = malloc (size);
     }
     MemoryDictionaryCount = 0;
     MemoryNext = MemoryOldest = 0;
