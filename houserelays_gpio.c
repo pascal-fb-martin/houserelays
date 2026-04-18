@@ -313,13 +313,11 @@ static int houserelay_gpio_apply (struct RelayIo *io,
 
 static void houserelay_gpio_cleanup (struct RelayIo *io) {
 
-    if (io->count > 0) {
-        if (io->settings) gpiod_line_settings_free(io->settings);
-        io->settings = 0; // Stay safe.
-        if (io->offsets) free (io->offsets);
-        io->offsets = 0; // Stay safe.
-        io->count = 0;
-    }
+    if (io->settings) gpiod_line_settings_free(io->settings);
+    io->settings = 0; // Stay safe.
+    if (io->offsets) free (io->offsets);
+    io->offsets = 0; // Stay safe.
+    io->count = 0;
 }
 
 const char *houserelays_gpio_refresh (void) {
