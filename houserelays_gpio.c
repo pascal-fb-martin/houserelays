@@ -148,9 +148,9 @@ static int OutputCount = 0;
 
 struct RelayIo {
     const char *name;
+    int count;
     struct gpiod_line_settings *settings;
     unsigned int *offsets;
-    int count;
 };
 
 static struct gpiod_chip *RelayChip = 0;
@@ -188,8 +188,7 @@ const char *houserelays_gpio_initialize (int argc, const char **argv) {
 static int houserelays_gpio_to_mode (const char *text) {
 
    // Default is output for compatibility with previous versions.
-   if (!text) return HOUSE_GPIO_MODE_OUTPUT;
-   if (!text[0]) return HOUSE_GPIO_MODE_OUTPUT;
+   if (!text || !text[0]) return HOUSE_GPIO_MODE_OUTPUT;
 
    if (!strcmp (text, "out")) return HOUSE_GPIO_MODE_OUTPUT;
    if (!strcmp (text, "output")) return HOUSE_GPIO_MODE_OUTPUT;
@@ -206,7 +205,7 @@ static const char *houserelays_gpio_from_mode (int point) {
     case HOUSE_GPIO_MODE_OUTPUT: return "output";
     case HOUSE_GPIO_MODE_INPUT:  return "input";
     }
-    return 0;
+    return ""; // Safe.
 }
 
 static long long houserelays_gpio_timestamp (void) {
@@ -305,8 +304,11 @@ static int houserelay_gpio_apply (struct RelayIo *io,
 
     if (io->count > 0) {
         if (gpiod_line_config_add_line_settings
-               (line, io->offsets, io->count, io->settings))
-            DEBUG ("Cannot apply settings for %s\n", io->name);
+               (line, io->offsets, io->count, io->settings)) {
+            houselog_trace (HOUSE_FAILURE, "GPIO",
+                            "Cannot apply settings for %s\n", io->name);
+            return 0;
+        }
     }
     return io->count;
 }
@@ -382,9 +384,9 @@ const char *houserelays_gpio_refresh (void) {
     InputCount = 0;
     OutputCount = 0;
 
+    int count = 0;
     int *list = calloc (RelayCount, sizeof(int));
     houseconfig_enumerate (relays, list, RelayCount);
-    int count = 0;
     for (i = 0; i < RelayCount; ++i) {
         int point = houseconfig_object (list[i], 0);
         if (point <= 0) continue;
@@ -408,10 +410,15 @@ const char *houserelays_gpio_refresh (void) {
         DEBUG ("found point %s, gpio %d, on %d %s\n", Relays[count].name, Relays[count].gpio, Relays[count].on, Relays[count].desc);
         count += 1;
     }
-    DEBUG ("Ignoring %d invalid points\n", RelayCount-count);
-    RelayCount = count; // Adjust the count to include valid entries only.
+    free (list);
+    if (count != RelayCount) {
+        houselog_trace (HOUSE_FAILURE, "GPIO",
+                        "Ignoring %d invalid points\n", RelayCount-count);
+        if (RelayCount <= 0) return "no valid point found";
+        RelayCount = count; // Adjust the count to include valid entries only.
+    }
 
-    // Now that the points configuration was retrieved,
+    // Now that the points configuration has been retrieved,
     // initialize the access to the IO.
     //
     struct RelayIo outhigh = {"outputs active high", 0, 0, 0};
@@ -464,19 +471,18 @@ const char *houserelays_gpio_refresh (void) {
         }
     }
 
-    int done = 0;
     struct gpiod_line_config *lineconfig = gpiod_line_config_new();
-    done += houserelay_gpio_apply (&outhigh, lineconfig);
-    done += houserelay_gpio_apply (&outlow,  lineconfig);
-    done += houserelay_gpio_apply (&inhigh,  lineconfig);
-    done += houserelay_gpio_apply (&inlow,   lineconfig);
+    count =  houserelay_gpio_apply (&outhigh, lineconfig);
+    count += houserelay_gpio_apply (&outlow,  lineconfig);
+    count += houserelay_gpio_apply (&inhigh,  lineconfig);
+    count += houserelay_gpio_apply (&inlow,   lineconfig);
 
     struct gpiod_request_config *requestconfig = gpiod_request_config_new();
     gpiod_request_config_set_consumer (requestconfig, "HouseRelays");
 
-    if (done) {
-        RelayLine = gpiod_chip_request_lines
-                        (RelayChip, requestconfig, lineconfig);
+    if (count > 0) {
+        RelayLine =
+            gpiod_chip_request_lines (RelayChip, requestconfig, lineconfig);
         if (!RelayLine) {
             houselog_trace (HOUSE_FAILURE, "GPIO",
                             "gpiod_chip_request_lines() failed");
@@ -493,7 +499,6 @@ const char *houserelays_gpio_refresh (void) {
     houserelay_gpio_cleanup (&inlow);
     gpiod_line_config_free (lineconfig);
     gpiod_request_config_free (requestconfig);
-    free (list);
 
     return 0;
 }

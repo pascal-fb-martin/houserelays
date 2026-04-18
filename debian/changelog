@@ -1,3 +1,9 @@
+houserelays (2.0) UNRELEASED; urgency=low
+
+   * Remove support for the libgpiod v1 API.
+   * Cleanup and simplify how the libgpiod API is used.
+
+ -- Pascal Martin <pascal.fb.martin@gmail.com>  Thu, 18 Apr 2026 12:00:00 PDT
 houserelays (1.8) UNRELEASED; urgency=low
 
    * Conform to the latest house control API documentation.
