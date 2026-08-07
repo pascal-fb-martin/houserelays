@@ -39,12 +39,16 @@
  *
  *    Return the number of configured relay points available.
  *
- * int houserelays_gpio_set (int point, int state, int pulse, const char *cause);
+ * int houserelays_gpio_set (int point, int state,
+ *                           long long pulse, const char *cause);
  *
  *    Set the specified point to the on (1) or off (0) state for the pulse
- *    length specified. The pulse length is in seconds. If pulse is 0,
- *    the relay is maintained until a new state is applied. The cause
- *    parameter, if not null, is used to populate the event.
+ *    length specified (in milliseconds). If pulse is 0, the request is to
+ *    maintain the relay active until a new state is applied. The cause
+ *    parameter, if not null, is reproduced in the event.
+ *
+ *    The relay is never maintained active for longer than the pulse limit
+ *    specified int the configuration, if any.
  *
  *    Return 1 on success, 0 if the point is not known and -1 on error.
  *
@@ -116,7 +120,7 @@
 //
 #define HOUSE_GPIO_PERIOD_DEFAULT 100  // Milliseconds.
 #define HOUSE_GPIO_PERIOD_MIN     10   // Milliseconds.
-#define HOUSE_GPIO_SCAN_TIMEOUT 15   // Seconds.
+#define HOUSE_GPIO_SCAN_TIMEOUT   15   // Seconds.
 
 struct RelayMap {
     const char *name;
@@ -126,10 +130,11 @@ struct RelayMap {
     int mode;
     int gpio;
     int on;
+    int pulse;  // Maximum pulse time supported by the gear, in milliseconds.
     int failed; // Failure already detected, avoid logging the same error.
     int state;
     int commanded;
-    time_t deadline;
+    long long deadline; // in milliseconds
 
     int history; // Index of this input point in the history.
 };
@@ -159,7 +164,8 @@ static struct gpiod_line_request *RelayLine = 0;
 static const char *DebugChip = 0;
 
 static int       RelaySamplingPeriod = HOUSE_GPIO_PERIOD_DEFAULT;
-static time_t    RelayFastScanEnabled = 0; // Fastscan is on a timer.
+static time_t    RelayFastScanEnd = 0; // Fastscan is on a timer.
+static int       RelayHasActivePulse = 0;
 
 static int LiveGpioState = -1;
 
@@ -225,6 +231,23 @@ static int houserelays_gpio_store (int point, int state) {
     return 1;
 }
 
+static void houserelays_gpio_checkpulses (long long timestamp) {
+
+    if (!RelayHasActivePulse) return;
+    RelayHasActivePulse = 0; // Unless one is still active.
+
+    int i;
+    for (i = RelayCount-1; i >= 0; --i) {
+        if (Relays[i].deadline <= 0) continue;
+        if (Relays[i].mode != HOUSE_GPIO_MODE_OUTPUT) continue;
+        if (Relays[i].deadline <= timestamp) {
+            houserelays_gpio_set (i, 1 - Relays[i].commanded, -1, 0);
+            continue;
+        }
+        RelayHasActivePulse = 1;
+    }
+}
+
 static void houserelays_gpio_scanner (int fd, int mode) {
 
     if (InputCount <= 0) return; // Beter safe than sorry.
@@ -248,13 +271,15 @@ static void houserelays_gpio_scanner (int fd, int mode) {
     }
     if (changed) housestate_changed (LiveGpioState);
     houserelays_memory_done (timestamp);
+
+    houserelays_gpio_checkpulses (timestamp);
 }
 
-void houserelays_gpio_fast (int period) {
+void houserelays_gpio_enablefast (int period, int duration) {
 
     if (InputCount <= 0) return; // Nothing to enable anyway.
 
-    if (period && RelayFastScanEnabled) {
+    if (period && RelayFastScanEnd) {
         // If an explicit sampling period is requested while already
         // scanning, only accept smaller periods (faster). This is
         // because there could be multiple clients and we must adjust
@@ -265,9 +290,9 @@ void houserelays_gpio_fast (int period) {
         period = 0; // We are done with updating the period.
 
         // If the period has changed, reset the memory storage.
-        if (old != RelaySamplingPeriod) RelayFastScanEnabled = 0;
+        if (old != RelaySamplingPeriod) RelayFastScanEnd = 0;
     }
-    if (!RelayFastScanEnabled) { // Protection against self reset.
+    if (!RelayFastScanEnd) { // Protection against self reset.
         if (period) houserelays_gpio_setperiod (period);
         echttp_fastscan (houserelays_gpio_scanner, RelaySamplingPeriod);
         houserelays_memory_reset (InputCount, RelaySamplingPeriod);
@@ -277,14 +302,20 @@ void houserelays_gpio_fast (int period) {
             Relays[point].history = houserelays_memory_add (Relays[point].name);
         }
     }
-    RelayFastScanEnabled = time(0); // Keep fast scanning for now.
+    // Extend fast scanning for some more time.
+    time_t end = time(0) + duration;
+    if (RelayFastScanEnd < end) RelayFastScanEnd = end;
+}
+
+void houserelays_gpio_fast (int period) {
+   houserelays_gpio_enablefast (period, HOUSE_GPIO_SCAN_TIMEOUT);
 }
 
 static void houserelays_gpio_slow (void) {
 
-    if (RelayFastScanEnabled) {
+    if (RelayFastScanEnd) {
         echttp_fastscan (0, 0);
-        RelayFastScanEnabled = 0;
+        RelayFastScanEnd = 0;
     }
 }
 
@@ -400,6 +431,8 @@ const char *houserelays_gpio_refresh (void) {
         Relays[count].desc = houseconfig_string (point, ".description");
         Relays[count].gpio = houseconfig_integer (point, ".gpio");
         Relays[count].on  = houseconfig_integer (point, ".on") & 1;
+
+        Relays[count].pulse = houseconfig_positive (point, ".pulse");
 
         Relays[count].signature = echttp_hash_signature (Relays[count].name);
         Relays[count].state = 0;
@@ -517,7 +550,8 @@ int houserelays_gpio_count (void) {
     return RelayCount;
 }
 
-int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
+int houserelays_gpio_set (int point, int state,
+                          long long pulse, const char *cause) {
 
     if (point < 0 || point > RelayCount) return 0;
 
@@ -528,9 +562,16 @@ int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
     time_t now = time(0);
     const char *namedstate = state?"on":"off";
 
+    // Limit the active time of the control is the configuration specifies
+    // a maximum pulse value.
+    int max = Relays[point].pulse;
+    if (max > 0) {
+        if ((pulse == 0) || (pulse > max)) pulse = max;
+    }
+
     if (echttp_isdebug()) {
         if (pulse)
-            printf ("set %s to %s at %lld (pulse %ds)\n", Relays[point].name, namedstate, (long long)now, pulse);
+            printf ("set %s to %s at %lld (pulse %lld ms)\n", Relays[point].name, namedstate, (long long)now, pulse);
         else
             printf ("set %s to %s at %lld\n", Relays[point].name, namedstate, (long long)now);
     }
@@ -553,14 +594,29 @@ int houserelays_gpio_set (int point, int state, int pulse, const char *cause) {
         comment[0] = 0;
 
     if (pulse > 0) {
-        Relays[point].deadline = time(0) + pulse;
-        houselog_event ("GPIO", Relays[point].name, namedstate,
-                        "FOR %d SECONDS%s", pulse, comment);
+
+        long long s = pulse / 1000;
+        int ms = (int) (pulse % 1000);
+        if (ms) {
+            Relays[point].deadline = houserelays_gpio_timestamp() + pulse;
+            houselog_event ("GPIO", Relays[point].name, namedstate,
+                            "FOR %lld.%03d SECONDS%s", s, ms, comment);
+            // Scan not faster and not longer than needed.
+            houserelays_gpio_enablefast ((ms%100)?10:50, s + 1);
+        } else {
+            Relays[point].deadline = (time(0) + s) * 1000;
+            houselog_event ("GPIO", Relays[point].name, namedstate,
+                            "FOR %lld SECONDS%s", s, comment);
+        }
+        RelayHasActivePulse = 1;
+
     } else if (pulse < 0) {
+
         Relays[point].deadline = 0;
         houselog_event ("GPIO", Relays[point].name, namedstate,
                         "END OF PULSE");
     } else {
+
         Relays[point].deadline = 0;
         houselog_event ("GPIO", Relays[point].name, namedstate,
                         "LATCHED%s", comment);
@@ -588,7 +644,7 @@ void houserelays_gpio_update (void) {
         }
     }
 
-    if (!RelayFastScanEnabled && (InputCount > 0)) {
+    if (!RelayFastScanEnd && (InputCount > 0)) {
        // Must read input points now since there is no high speed scan.
        if (gpiod_line_request_get_values_subset
                 (RelayLine, InputCount, InputOffset, RelayValues)) {
@@ -617,9 +673,9 @@ void houserelays_gpio_status (ParserContext context, int root) {
        if ((Relays[i].mode == HOUSE_GPIO_MODE_OUTPUT) &&
            (strcmp (status, commanded)))
            echttp_json_add_string (context, point, "command", commanded);
-       if (Relays[i].deadline) {
+       if (Relays[i].deadline > 0) {
            echttp_json_add_integer
-               (context, point, "pulse", Relays[i].deadline);
+               (context, point, "pulse", Relays[i].deadline / 1000);
        }
        if (Relays[i].gear && (Relays[i].gear[0] != 0))
            echttp_json_add_string (context, point, "gear", Relays[i].gear);
@@ -628,20 +684,17 @@ void houserelays_gpio_status (ParserContext context, int root) {
 
 void houserelays_gpio_periodic (time_t now) {
 
-    int i;
-    for (i = 0; i < RelayCount; ++i) {
-        if (Relays[i].mode != HOUSE_GPIO_MODE_OUTPUT) continue;
-        if (Relays[i].deadline > 0 && now >= Relays[i].deadline) {
-            houserelays_gpio_set (i, 1 - Relays[i].commanded, -1, 0);
-        }
+    if (RelayFastScanEnd) {
+        // If there is no changes request for much more than the stored
+        // history and no pulse to maintain, disable fast scan: there is
+        // no need  for it anymore.
+        if (now > RelayFastScanEnd) houserelays_gpio_slow ();
     }
 
-    if (RelayFastScanEnabled) {
-        // If there was no changes request for much more than the stored
-        // history, disable fast scan: there is no active client anymore.
-        time_t deadline = RelayFastScanEnabled + HOUSE_GPIO_SCAN_TIMEOUT;
-
-        if (now > deadline) houserelays_gpio_slow ();
+    if (!RelayFastScanEnd) { // May have have been reset above..
+        // Check for pulses here if there is no active fast scan.
+        // Otherwise the fast scan takes care of the pulses.
+        houserelays_gpio_checkpulses (now * 1000); // Pulses in milliseconds.
     }
 }
 

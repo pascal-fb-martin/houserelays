@@ -86,7 +86,7 @@ static const char *relays_set (const char *method, const char *uri,
     const char *pulsep = echttp_parameter_get("pulse");
     const char *cause = echttp_parameter_get("cause");
     int state;
-    int pulse;
+    long long pulse = 0;
     int found = 0;
 
     if (!point) {
@@ -106,10 +106,30 @@ static const char *relays_set (const char *method, const char *uri,
         return "";
     }
 
-    pulse = pulsep ? atoi(pulsep) : 0;
-    if (pulse < 0) {
-        echttp_error (400, "invalid pulse value");
-        return "";
+    if (pulsep) {
+        char *endp; // Warning: strtoll() converts 'const char *' to 'char *'..
+        pulse = strtoll (pulsep, &endp, 10);
+        if (pulse < 0) {
+            echttp_error (400, "invalid pulse value");
+            return "";
+        }
+        pulse *= 1000; // Convert internally to milliseconds.
+
+        if (endp[0] == '.') {
+            // Read the fractional part up to 3 digits, ignore any more digits
+            static int weight[] = {0, 100, 10, 1};
+            char c;
+            int i;
+            for (i = 1; i <= 3; ++i) {
+                c = endp[i];
+                if ((c < '0') || (c > '9')) break;
+                pulse += (c - '0') * weight[i];
+            }
+            if (i == 4) {
+                c = endp[i];
+                if ((c >= '5') && (c <= '9')) pulse += 1; // Rounding.
+            }
+        }
     }
 
     if (!strcmp (point, "all")) {
@@ -190,7 +210,7 @@ static const char *relays_config (const char *method, const char *uri,
         if (error) {
             echttp_error (400, error);
         }
-        return "";
+        return houseconfig_current();
     }
 
     echttp_error (400, "invalid state value");

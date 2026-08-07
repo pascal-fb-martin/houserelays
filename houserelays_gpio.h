@@ -30,7 +30,8 @@ int houserelays_gpio_count (void);
 const char *houserelays_gpio_failure (int point);
 
 int houserelays_gpio_get (int point);
-int houserelays_gpio_set (int point, int state, int pulse, const char *cause);
+int houserelays_gpio_set (int point, int state,
+                          long long pulse, const char *cause);
 
 void houserelays_gpio_update (void);
 int  houserelays_gpio_same (void);

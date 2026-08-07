@@ -48,6 +48,7 @@ A typical exemple of configuration is:
                 "mode" : "output",
                 "on" : 0,
                 "gear" : "valve",
+                "pulse" : 700,
                 "connection" : 1,
                 "description": "Relay 1"
             },
@@ -74,6 +75,13 @@ If on is 0, the point is configured as open-drain with pull-up enabled, the on c
 If on is 1, an output point is configured as push-pull, the on command sets the output to 1, and the off command sets the output to 0.
 
 The `gear` attribute can be used by applications to filter which control points to show on their user interface. Typical values are valve (irrigation) and light.
+
+The `pulse` attribute is optional. If present, it represents a duration in milliseconds and sets a limit to how long the control may be maintained active (regardless of the request). The intent of this attribute is to protect gears that would be damaged if maintained active for an excessive duration, for example a coil under high current. If this attribute is set, any request with no pulse, or with a pulse value greater than this limit, with be silently interpreted as a request with this pulse limit's duration.
+
+This pulse limit is not exact as it is sensitive to the polling period, and that polling period depends on the requested accuracy. As a general rule, a limit in thousands of milliseconds should be set to 1 second less than the actual gear limit, a limit in hundreds of milliseconds should be set to 50 milliseconds less than the actual gear limit, and any more precise limit should be set to 10 milliseconds less than the actual gear limit. for example a pulse limit of 6000 milliseconds may cause an actual pulse anywhere between 5 and 7 seconds, while a pulse limit of 6001 milliseconds may produce an actual pulse anywhere between 5991 and 6011 milliseconds.
+
+> [!WARNING]
+> There are ways to overcome this protection mechanism, for example by repeating the request at a high frequency. Use common sense.
 
 The connection and description items are informational. The connection item can be used to match the markings on the relays motherboard. The description item can be used to store any useful comment about this point's purpose or special properties.
 
